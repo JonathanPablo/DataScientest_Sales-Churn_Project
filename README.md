@@ -1,7 +1,7 @@
 # DataScientest Project: Sales- & Churn-prediction of health-insurance data
 Collective Repo for all sub-projects of the DataScientest-Project.
 Here will be a main introduction to the project...
-
+Files can be added into the created subfolders..
 
 ## Sub-Projects
 In these repos you can find further informations about the process within the sub-projects:
