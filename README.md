@@ -4,7 +4,8 @@ Files can be added into the created subfolders..
 Some example headers where added...
 
 ## Introduction
-Here will be a main introduction to the project...
+Here will be a main introduction to the project... including pictures..
+
 ![Including pictures..](https://github.com/JonathanPablo/DataScientest_Sales-Churn_Project/assets/134729968/962581eb-ed83-4149-a433-b36e68ba9e08)
 
 ## Problems & Sub-Projects
