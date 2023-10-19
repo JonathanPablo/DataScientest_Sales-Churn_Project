@@ -16,6 +16,7 @@ import missingno as msno #NaN-plotting
 import requests #to get e.g. country information from REST API
 import time
 import ast # to print here created functions
+import math
 
 # functions & modules for ML
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
@@ -151,7 +152,7 @@ def built_claim_ratios(df):
 #_________________________________________________________________________________________________________________________
 
 # main preprocessing function 
-def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = True): 
+def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = True, cut_effEnd = False, cut_date = '2030-12-31'): 
     '''
     transform preprocessing steps on imported df and return df again.
     
@@ -160,13 +161,22 @@ def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = Tr
     - year_only : optional parameter to replace all date columns by their year only
     - drop_cols : optional parameter: list of columns names that should be dropped (if encoded = True they will be dropped before encoding) (default: [])
     - claim_ratios : calculate ratio of claimed amount & drop absolute values (default: True)
+    - cut_effEnd = False (if True: all effEndDates > 2030 are set to 2023-12-31)
+    - cut_date = '2030-12-31' (optional: set to choose other date to cut effEndDates)
 
     return: 
     preprocessed pandas df  
-    '''    
+    '''
+    print('preprocessing results:')
+    
     # get initial number of rows and cols
     init_rows = len(contracts) 
     init_cols = contracts.columns
+    
+    # set contractID as Index, unique value and should not be used as feature
+    if 'ContractID' in contracts.columns:
+        contracts.set_index('ContractID', inplace=True)
+    
     
     # 1.1 Datatypes
     contracts = transform_dtypes(contracts)
@@ -197,9 +207,16 @@ def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = Tr
     contracts['policyAge'] = np.round((contracts.RefDate - contracts.policy_startDate) / np.timedelta64(1, 'M'),0)#.astype(int)
     contracts['insured_Age'] = np.round((contracts.update_Date - contracts.insured_birthDate) / np.timedelta64(1, 'Y'),0).astype(int)
     
-    # because of high correlation to start date replace applydate by diff to startDate & fillna by 0
+    # because of high correlation to start date replace applydate by diff to startDate & fillna by 0 & replace outliers <0 by 0
     contracts['ApplyDate'].fillna(contracts.policy_startDate, inplace=True)
     contracts['ApplyDays'] = np.round((contracts.policy_startDate - contracts.ApplyDate) / np.timedelta64(1, 'D'),0).astype(int)
+    contracts.loc[contracts['ApplyDays'] < 0, 'ApplyDays'] = 0
+    
+    # optional: cut policy_effEndDates
+    if cut_effEnd:
+        # Set values greater than the target date to the target date
+        contracts.loc[contracts['policy_effEndDate'] > cut_date, 'policy_effEndDate'] = cut_date
+    
     
     # replace paid_until by boolean value, telling if it got paid or not
     contracts['paid'] = np.where(contracts.paid_until.isnull(),0,1) 
@@ -282,6 +299,20 @@ def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = Tr
     contracts = contracts.loc[(contracts.num_claims_total < 200 )&(contracts.num_claims_lastActivYear < 100)]
     A = len(contracts)
     print(B-A, 'lines dropped due to outlier in num_claims')
+    
+    # in claims columns
+    B = len(contracts)
+    contracts = contracts.loc[(contracts.sum_claimed_total < 30000 )&(contracts.sum_claimed_lastActivYear < 20000)]
+    A = len(contracts)
+    print(B-A, 'lines dropped due to outlier in claims columns')
+    
+    # in MainProductCode
+    for val in contracts['MainProductCode'].value_counts().index:
+        num = len(contracts.loc[contracts['MainProductCode'] == val])
+        if num < 5:
+            contracts = contracts.loc[contracts['MainProductCode'] != val]
+            print(f'{num} rows dropped because MainProductCode {val} contains too little contracts.')
+    
 
     # 1.5 Optional: keep only year info from date cols, e.g. for DecisionTrees: 
     if year_only == True:
@@ -319,9 +350,10 @@ def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = Tr
     drop_cols.clear()
     return contracts
 
+
 #_________________________________________________________________________________________________________________________
 
-def transform_contracts(contracts, year_only = False, drop_cols = [], claim_ratios = True, print_terminal=True):
+def transform_contracts(contracts, year_only = False, drop_cols = [], claim_ratios = True, cut_effEnd = False, cut_date = '2030-12-31', print_terminal=True):
     '''
     uses 'transform_df' to preprocess contracts df and adds option to hide or unhide prints by:
     - print_terminal = True # Options: True, False
@@ -334,15 +366,16 @@ def transform_contracts(contracts, year_only = False, drop_cols = [], claim_rati
         - year_only : optional parameter to replace all date columns by their year only
         - drop_cols : optional parameter: list of columns names that should be dropped  (default: [])
         - claim_ratios : calculate ratio of claimed amount & drop absolute values (default: True)
-
+        - cut_effEnd = False (if True: all effEndDates > 2030 are set to 2030-12-31)
+        - cut_date = '2030-12-31' (optional: set to choose other date to cut effEndDates)
         return: 
         preprocessed pandas df
     '''
     if print_terminal:
-        return transform_df(contracts, year_only = year_only, drop_cols = drop_cols, claim_ratios = claim_ratios)
+        return transform_df(contracts, year_only = year_only, drop_cols = drop_cols, claim_ratios = claim_ratios, cut_effEnd = cut_effEnd, cut_date = cut_date)
     else:
         with HiddenPrints():
-            return transform_df(contracts, year_only = year_only, drop_cols = drop_cols, claim_ratios = claim_ratios)
+            return transform_df(contracts, year_only = year_only, drop_cols = drop_cols, claim_ratios = claim_ratios, cut_effEnd = cut_effEnd, cut_date = cut_date)
 
 #_________________________________________________________________________________________________________________________
 
@@ -424,8 +457,9 @@ def merge_products_to_contracts(products, contracts):
     
     # merge with contracts
     cols = products.columns.difference(contracts.columns) #avoid column duplicates
-    contracts = contracts.merge(products[cols], how = 'left', on='product_code', validate='m:1') # use product_code as key + check again, if unique in product df
-    # convert product_code as str again
+    
+     # use product_code as key + check again, if unique in product df. + keep ContractID as Index
+    contracts = contracts.reset_index().merge(products[cols], how = 'left', on='product_code', validate='m:1').set_index('ContractID')    # convert product_code as str again
     contracts.product_code = contracts.product_code.convert_dtypes()
 
     #fillna
@@ -784,6 +818,64 @@ def plot_target_corr(df, target_col = 'terminated', k = 20, encode = True, fs = 
 
 #_________________________________________________________________________________________________________________________
 
+def plot_outliers(df, dtype = 'number', top_k = 4, plot='box'):
+    '''
+    plot scatterplots for columns with most rel. difference between min and max:
+    
+    input:
+    - df
+    - dtype = 'number' (options: 'number', 'float', 'int')
+    - top_k = 4 (number of columns to plot scatterplots for)
+    - plot = 'scatter' (options: 'scatter', 'box') --> kind of plot for outliers
+    '''    
+    cols = df.select_dtypes(include=[dtype]).columns
+    
+    rels = {}
+    for col in cols:
+        Cmax = df[col].max()
+        Cmin = df[col].min()
+        Cmean = df[col].mean()
+        Crel = np.abs(Cmax - Cmin)/Cmean
+        rels[col] = Crel.round(1)        
+    # sort by values
+    rels = dict(sorted(rels.items(), key=lambda item: item[1]))
+    print(f'oredered ratio of max to min value in {dtype} cols:\n', rels)
+
+    outlier_cols = list(rels)[-top_k:]
+    print(f'\n top {top_k} outlier_cols of dtype {dtype} due to min-max-ratio:\n',outlier_cols)
+          
+    if plot == 'scatter':
+        g = sns.PairGrid(data=df,vars=outleier_cols, hue="terminated")
+        g.map(sns.scatterplot)
+        g.add_legend();
+          
+    elif plot in ['violin','box']:
+        # Calculate the number of rows and columns in the subplot grid
+        num_cols = 2
+        num_rows = math.ceil(len(outlier_cols) / num_cols)
+
+        # Create a grid of subplots
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(12, 8))
+        fig.suptitle(f'{plot}-plots for top {top_k} outliers of dtype {dtype}', fontsize=16)
+
+        # Flatten the axes array if it's multidimensional
+        axes = axes.flatten()
+
+        # Create violin plots for each specified column
+        for i, col in enumerate(outlier_cols):
+            if plot == 'violin':
+                sns.violinplot(x=df[col], ax=axes[i], inner="quartile")
+            elif plot == 'box':
+                sns.boxplot(x=df[col], ax=axes[i])
+            axes[i].set_title(col)
+
+        # Hide any empty subplots
+        for i in range(len(outlier_cols), num_rows * num_cols):
+            fig.delaxes(axes[i])
+
+        plt.tight_layout()
+        plt.show()
+    return
 
 #_________________________________________________________________________________________________________________________
 
@@ -818,7 +910,7 @@ def create_train_test(df,
     - test_size = 0.2 (ratio of test data)
     - ds_target = False (if True --> target value y is set to ds_terminated)
     - ds_reasons = ['10014','10015','10016'] (termination reasons that are used for creation of ds_terminated)
-    - encoder = CountFrequency (encoder for categorical variables, other option: 'getDummies')
+    - encoder = CountFrequency (encoder for categorical variables, other option: 'getDummies', None [if already encoded])
     - feature_selection = [] (insert col-names for selection, otherwise all columns will be taken into account)
     - test_nan = 'drop' (handling of NaN values in test set after encoding. other option: 'fill')
     
