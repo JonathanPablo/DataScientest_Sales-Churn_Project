@@ -642,7 +642,7 @@ def show_term_reasons(df):
     columns = 2
 
     # reading images
-    Image2 = cv2.imread('images/TerminationReasons_En.png')
+    Image2 = cv2.imread('images/ERP-System+SQL/TerminationReasons_En.png')
 
     # Adds a subplot at the 1st position
     fig.add_subplot(rows, columns, 1)
