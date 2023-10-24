@@ -24,10 +24,15 @@ from sklearn.model_selection import train_test_split, cross_val_score, Stratifie
 from sklearn.linear_model import LogisticRegression
 from sklearn import svm
 from sklearn.tree import DecisionTreeClassifier, plot_tree
-from sklearn.metrics import accuracy_score, f1_score, classification_report, roc_auc_score, roc_curve, auc
+from sklearn.metrics import accuracy_score, f1_score, classification_report, roc_auc_score, roc_curve, auc, confusion_matrix, ConfusionMatrixDisplay, fbeta_score, make_scorer
 import shap
 import xgboost as xgb
 from feature_engine.encoding import CountFrequencyEncoder
+
+#for resampling imbalanced data:
+from imblearn.over_sampling import RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
+from imblearn.pipeline import Pipeline
 
 #streamlit & Co
 import streamlit as st
@@ -35,6 +40,9 @@ import io
 import contextlib
 import os, sys
 
+#_________________________________________________________________________________________________________________________
+#initiate empty train & test data to avoid errors in function definition
+X_train, X_test, y_train, y_test = (0,0,0,0)
 #_________________________________________________________________________________________________________________________
 
 #create class to hide print outputs
@@ -157,12 +165,16 @@ def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = Tr
     transform preprocessing steps on imported df and return df again.
     
     input:
-    - contracts : pandas df containing contract informations
-    - year_only : optional parameter to replace all date columns by their year only
-    - drop_cols : optional parameter: list of columns names that should be dropped (if encoded = True they will be dropped before encoding) (default: [])
-    - claim_ratios : calculate ratio of claimed amount & drop absolute values (default: True)
-    - cut_effEnd = False (if True: all effEndDates > 2030 are set to 2023-12-31)
-    - cut_date = '2030-12-31' (optional: set to choose other date to cut effEndDates)
+        • year_only: bool, default=False
+            o Set to True to keep only year of all datetime features and convert them to int. Otherwise year and month will be separated and kept.
+        • Drop_cols: list of strings, default = []
+            o Inserted strings will be tried to be dropped. If col name doesn’t exist or already got dropped within the regular preprocessing process a corresponding message will be printed.
+        • claim_ratios: bool, default=True
+            o If set to True, some claims related columns will be dropped or replaced and cleaned to minimize correlating columns. In specific: retained columns get dropped, payout amount columns cleaned and replaced by a ratio of claimed amount.
+        • cut_effEnd: bool, default=False
+            o Set to True to cut policy_effEndDate values at a specific cut_date to tighten distribution.
+        • cut_date: datetime, default = ‘2030-12-31’
+            o Optional, if cut_effEnd == True. All policy_effEndDate values > cut_date will be replaced by this value.
 
     return: 
     preprocessed pandas df  
@@ -215,14 +227,18 @@ def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = Tr
     # optional: cut policy_effEndDates
     if cut_effEnd:
         # Set values greater than the target date to the target date
+        B = len(contracts.loc[contracts['policy_effEndDate'] > cut_date])
         contracts.loc[contracts['policy_effEndDate'] > cut_date, 'policy_effEndDate'] = cut_date
+        A = len(contracts.loc[contracts['policy_effEndDate'] > cut_date])
+        if B>A:
+            print('policy_effEndDate cut off at',cut_date,'for',B-A,'lines.')        
     
     
     # replace paid_until by boolean value, telling if it got paid or not
     contracts['paid'] = np.where(contracts.paid_until.isnull(),0,1) 
     
-    #drop now redundant cols
-    for col in ['insured_birthDate','ApplyDate','paid_until','RefDate','SignDate']:
+    #drop now redundant cols (update_Date is uniform and policy_initialEndDate not important, if we have effEndDate)
+    for col in ['insured_birthDate','ApplyDate','paid_until','RefDate','SignDate', 'update_Date', 'policy_initialEndDate']:
         drop_cols.append(col) 
         
     # drop all 'lastYear'-cols, since we have lastActiveYear cols
@@ -315,11 +331,21 @@ def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = Tr
     
 
     # 1.5 Optional: keep only year info from date cols, e.g. for DecisionTrees: 
-    if year_only == True:
-        for col in contracts.select_dtypes(include=['datetime64[ns]']).columns:
-            contracts[col] = contracts[col].dt.year
-            print('date columns transformed to year only')
+    #if year_only == True:
+    #    for col in contracts.select_dtypes(include=['datetime64[ns]']).columns:
+    #        contracts[col] = contracts[col].dt.year
+    #        print('date columns transformed to year only')
     
+    # 1.5 create year & optional month of start- & effEndDate
+    contracts['start_Year'] = contracts['policy_startDate'].dt.year
+    contracts['effEnd_Year'] = contracts['policy_effEndDate'].dt.year
+        
+    if year_only == False:
+        contracts['start_Month'] = contracts['policy_startDate'].dt.month
+        contracts['effEnd_Month'] = contracts['policy_startDate'].dt.month
+    #contracts.drop(columns=['policy_startDate','policy_effEndDate'], inplace=True) #drop later at train/test-split (to keep dataviz running for preprocessed df too)
+        
+            
     # create payout ratio(s) & drop absolute cols
     if claim_ratios == True:
         contracts = built_claim_ratios(contracts)
@@ -350,7 +376,6 @@ def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = Tr
     drop_cols.clear()
     return contracts
 
-
 #_________________________________________________________________________________________________________________________
 
 def transform_contracts(contracts, year_only = False, drop_cols = [], claim_ratios = True, cut_effEnd = False, cut_date = '2030-12-31', print_terminal=True):
@@ -362,12 +387,17 @@ def transform_contracts(contracts, year_only = False, drop_cols = [], claim_rati
         transform preprocessing steps on imported df and return df again.
 
         input:
-        - contracts : pandas df containing contract informations
-        - year_only : optional parameter to replace all date columns by their year only
-        - drop_cols : optional parameter: list of columns names that should be dropped  (default: [])
-        - claim_ratios : calculate ratio of claimed amount & drop absolute values (default: True)
-        - cut_effEnd = False (if True: all effEndDates > 2030 are set to 2030-12-31)
-        - cut_date = '2030-12-31' (optional: set to choose other date to cut effEndDates)
+        • year_only: bool, default=False
+            o Set to True to keep only year of all datetime features and convert them to int. Otherwise year and month will be separated and kept.
+        • Drop_cols: list of strings, default = []
+            o Inserted strings will be tried to be dropped. If col name doesn’t exist or already got dropped within the regular preprocessing process a corresponding message will be printed.
+        • claim_ratios: bool, default=True
+            o If set to True, some claims related columns will be dropped or replaced and cleaned to minimize correlating columns. In specific: retained columns get dropped, payout amount columns cleaned and replaced by a ratio of claimed amount.
+        • cut_effEnd: bool, default=False
+            o Set to True to cut policy_effEndDate values at a specific cut_date to tighten distribution.
+        • cut_date: datetime, default = ‘2030-12-31’
+            o Optional, if cut_effEnd == True. All policy_effEndDate values > cut_date will be replaced by this value.
+
         return: 
         preprocessed pandas df
     '''
@@ -379,17 +409,19 @@ def transform_contracts(contracts, year_only = False, drop_cols = [], claim_rati
 
 #_________________________________________________________________________________________________________________________
 
-def save_df(df ,filename='contracts_preprocessed.csv'):
+def save_df(df ,filename='contracts_preprocessed'):
     '''
     input: 
     - df 
-    - filename (optional, default:'contracts_preprocessed.csv')
+    - filename (optional, default:'contracts_preprocessed')
     
-    saves df to filename='contracts_preprocessed.csv'
+    saves df to 'preprocessed/' subfolder as str(filename)+'.csv'
     
     example: save_df(contracts)
     '''
-    df.to_csv(filename)
+    path = 'preprocessed/'+str(filename)+'.csv'
+    df.to_csv(path)
+    print('df saved to',path)
     
 #_________________________________________________________________________________________________________________________
 
@@ -428,7 +460,9 @@ def transform_products(products, drop_cols = []):
     # 3 columns have NaN product_category --> product_group = Gebühren/Zuschläge (Fees/Surcharges) --> not interesting for contracts --> drop
     products.dropna(subset=['product_category'], inplace=True)
     
+    # drop redundant columns
     drop_cols.append('product_groupName')
+    drop_cols.append('MainProductName')
     # optional: drop cols
     if len(drop_cols)>0:
         for col in drop_cols:
@@ -918,8 +952,17 @@ def create_train_test(df,
     - X_train, X_test, y_train, y_test 
     - encoder (only if encoder is set to 'CountFrequency') --> to reverse transform X later
     '''
+    # (re-)set ContractID as Index (if loaded from csv file)
+    if 'ContractID' in df.columns:
+        df.set_index('ContractID', inplace=True)
+
+    # transform dtypes (if lost by csv import) 
+    if 'object' in df.dtypes.values:
+        df = transform_dtypes(df)
+    
     #(re-)create alternative target value
-    df['ds_terminated'] = np.where(((df.terminated == 1) & (df.terminationReason.isin(ds_reasons))), 1, 0)
+    if 'ds_terminated' not in df.columns:
+        df['ds_terminated'] = np.where(((df.terminated == 1) & (df.terminationReason.isin(ds_reasons))), 1, 0)
     
     term_cols = ['terminated','ds_terminated','terminationReason']
     # optional: feature selection
@@ -934,6 +977,7 @@ def create_train_test(df,
     #optional: split by date:
     if split_by_date == True:
         df = df.sort_values(split_date_col, ascending = True)
+        df.drop(columns=['policy_startDate','policy_effEndDate'], inplace=True) # drop columns now to keep only year (& month)
         train_set, test_set= np.split(df, [int((1-test_size) *len(df))])
         X_train = train_set.drop(columns=term_cols)
         X_test = test_set.drop(columns=term_cols)
@@ -944,6 +988,7 @@ def create_train_test(df,
             y_train = train_set.terminated
             y_test = test_set.terminated
     else:
+        df.drop(columns=['policy_startDate','policy_effEndDate'], inplace=True) # drop columns now to keep only year (& month)
         if ds_target == True:
             y = df.ds_terminated
 
@@ -1005,6 +1050,10 @@ def create_train_test(df,
     #split only if not already splitted by date
     if split_by_date == False:   
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
+        
+    # check, that y are arrays
+    y_train, y_test = np.array(y_train.astype('int')), np.array(y_test.astype('int'))
+    
     if print_shape == True:
         print(f'{X_train.shape = } \n{X_test.shape = } \n{y_train.shape = } \n{y_test.shape = }') #test
 
@@ -1013,43 +1062,86 @@ def create_train_test(df,
 #_________________________________________________________________________________________________________________________
 
 # make predictions & evaluate
-def eval_model(model, X_train , X_test , data= 'all'):
+def eval_model(model, X_train , X_test , data= 'all', norm_CM = 'true'):
     '''
-    creates classification reports for input model
+    Creates confusion matrix and classification reports for input model and returns predictions for X_train & X_test.
     
     input:
     - model
-    - data: 'train', 'test', 'all' (default: 'train') --> decides for which X data classification reports will be printed
+    - X_train
+    - X_test
+    - data: 'train' / 'test' / 'all' (default: 'all') --> decides for which X data classification reports will be printed
+    - normalize{‘true’, ‘pred’, ‘all’, None}, default='true'
+        -> Either to normalize the counts display in the matrix:
+            if 'true', the confusion matrix is normalized over the true conditions (e.g. rows);
+            if 'pred', the confusion matrix is normalized over the predicted conditions (e.g. columns);
+            if 'all', the confusion matrix is normalized by the total number of samples;
+            if None, the confusion matrix will not be normalized.
     
-    return: print classfication return
+    print:
+    - selected parameters for preprocessing, train-test-split and scaling
+    - classification report
+    - confustion matrix
+    
+    return: y_pred_train, y_pred_test
     '''
-    print('selected model:',model.__class__.__name__,'\n')
+    print('selected model:',model.__class__.__name__)
+    print('_________________________________________________________\n')
+    
+    #print all selected parameters
+    if prepro_params:
+        print('selected preprocessing parameters:')
+        for param_name, param_value in prepro_params.items():
+            print(f'{param_name} = {param_value}')
+        print('_________________________________________________________\n')
+    if split_params:
+        print('selected train-/test-split parameters:')
+        for param_name, param_value in split_params.items():
+            print(f'{param_name} = {param_value}')
+        print('_________________________________________________________\n')
+    if scaling_params:
+        print('selected scaling parameters:')
+        for param_name, param_value in scaling_params.items():
+            print(f'{param_name} = {param_value}')
+        print('_________________________________________________________\n')
+    
+    # create predictions
+    y_pred_train = model.predict(X_train)
+    y_pred_test = model.predict(X_test)
+    
     if data == 'train':
-        y_pred = model.predict(X_train)
-        #print(y_pred.dtype, y_train.dtype)
-        print('classification_report for train data:\n\n',classification_report(y_train, y_pred))
+        print('CM & classification_report for train data:\n\n', classification_report(y_train, y_pred))
+        ConfusionMatrixDisplay.from_estimator(model, X_train, y_train, normalize=norm_CM)
+        plt.title(f'Confusion Matrix of Train Data. Normalized by: {norm_CM}')
     elif data == 'test':
         y_pred = model.predict(X_test)
-        print('classification_report for test data:\n\n',classification_report(y_test, y_pred))
+        print('CM & classification_report for test data:\n\n', classification_report(y_test, y_pred))
+        ConfusionMatrixDisplay.from_estimator(model, X_test, y_test, normalize=norm_CM)
+        plt.title(f'Confusion Matrix of Test Data. Normalized by: {norm_CM}')
     elif data == 'all':
-        y_pred_train = model.predict(X_train)
-        print('classification_report for train data:\n\n',classification_report(y_train, y_pred_train))
-        y_pred_test = model.predict(X_test)
+        fig, axes = plt.subplots(1,2, sharey=True)
+        plt.suptitle(f'Confusion Matrix. Normalized by: {norm_CM}')
+        print('CM & classification_report for train data:\n\n',classification_report(y_train, y_pred_train))
+        
+        ConfusionMatrixDisplay.from_estimator(model, X_train, y_train, normalize=norm_CM, ax=axes[0])
+        axes[0].set_title(f'Train Data')
         print('_________________________________________________________\n')
-        print('classification_report for test data:\n\n',classification_report(y_test, y_pred_test))  
+        print('CM & classification_report for test data:\n\n', classification_report(y_test, y_pred_test))
+        ConfusionMatrixDisplay.from_estimator(model, X_test, y_test, normalize=norm_CM, ax = axes[1])
+        axes[1].set_title(f'Test Data')
     else:
         print('data value not set correctly')
-    
+    return y_pred_train, y_pred_test
 #_________________________________________________________________________________________________________________________
 
 # def function
-def shap_create_and_summary(model, data, plot = 'summary', example = None):
+def shap_create_and_summary(model, data = X_train, plot = 'summary', example = None):
     '''
     creates shap explainer and plots summary
     
     input:
     - model
-    - data: X_train, X_test
+    - data: X_train, X_test (default = X_train)
     - plot: kind of plot ('summary' / 'bar' / 'beeswarm')
     - example: plot example for this sample (optional)
     
@@ -1070,10 +1162,12 @@ def shap_create_and_summary(model, data, plot = 'summary', example = None):
         # Extract the first column of SHAP values
         shap_values_first_col = shap_values_3d.values[:, :, 0]
         base_values_first_col = shap_values_3d.base_values[:,0]
-        shap_values = shap.Explanation(shap_values_first_col, base_values=base_values_first_col, data=X_train)
+        shap_values = shap.Explanation(shap_values_first_col, base_values=base_values_first_col, data=data)
     
-    print(f'summary for {model.__class__.__name__}: \n')
-        
+    print(f'seleczed model: {model.__class__.__name__}')
+    print('selected preprocessing file:',filename)
+    print(f'most important features of model on train data:')    
+    
     if plot == 'summary':
         # Summary plot
         shap.summary_plot(shap_values, data)
