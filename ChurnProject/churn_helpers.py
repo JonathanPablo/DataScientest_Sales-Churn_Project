@@ -4,6 +4,7 @@
 #_________________________________________________________________________________________________________________________
 # import libraries & modules
 from IPython import display
+import ipywidgets as widgets
 import cv2
 from matplotlib import pyplot as plt
 import pandas as pd
@@ -24,10 +25,13 @@ from sklearn.model_selection import train_test_split, cross_val_score, Stratifie
 from sklearn.linear_model import LogisticRegression
 from sklearn import svm
 from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score, classification_report, roc_auc_score, roc_curve, auc, confusion_matrix, ConfusionMatrixDisplay, fbeta_score, make_scorer
 import shap
 import xgboost as xgb
 from feature_engine.encoding import CountFrequencyEncoder
+import scikitplot as skplt
+
 
 #for resampling imbalanced data:
 from imblearn.over_sampling import RandomOverSampler
@@ -39,10 +43,13 @@ import streamlit as st
 import io
 import contextlib
 import os, sys
+import joblib
 
 #_________________________________________________________________________________________________________________________
-#initiate empty train & test data to avoid errors in function definition
+#initiate variables to avoid erros:
 X_train, X_test, y_train, y_test = (0,0,0,0)
+prepro_params, split_params, scaling_params, ds_target, filename, reduce_ratio, scale, scaler, eval_data, split_by_date, Explainer, shap_values = None, None, None, None, None, None, None, None, None, None, None, None
+
 #_________________________________________________________________________________________________________________________
 
 #create class to hide print outputs
@@ -337,8 +344,10 @@ def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = Tr
     #        print('date columns transformed to year only')
     
     # 1.5 create year & optional month of start- & effEndDate
-    contracts['start_Year'] = contracts['policy_startDate'].dt.year
-    contracts['effEnd_Year'] = contracts['policy_effEndDate'].dt.year
+    if 'policy_startDate' in contracts.columns:
+        contracts['start_Year'] = contracts['policy_startDate'].dt.year
+    if 'policy_effEndDate' in contracts.columns:
+        contracts['effEnd_Year'] = contracts['policy_effEndDate'].dt.year
         
     if year_only == False:
         contracts['start_Month'] = contracts['policy_startDate'].dt.month
@@ -660,6 +669,64 @@ def encode_contracts(df, use_regions= True):
 
     return contracts_encoded
     
+    
+#_________________________________________________________________________________________________________________________
+
+    
+# copy to churn_helpers if no changes made
+def normalize(X_train, X_test, scale = True, scaler = MinMaxScaler()):
+    '''
+    normalizes X_train & X_test.
+    
+    input: X_train, X_test, scale = True, scaler = MinMaxScaler()
+    
+    return X_train, X_test
+    '''
+    
+    
+    if scale and scaler:
+        X_cols = X_train.columns
+
+        # should not be necassary anymore, since year & month got seperated
+        '''
+        #to avoid errors: exclude  datetime columns from scaling, if existant:
+        if any(X_train.dtypes == 'datetime64[ns]'):
+            noDates = X_train.select_dtypes(exclude='datetime64').columns # select only non-datetime columns to scale
+            X_train[noDates] = scaler.fit_transform(X_train[noDates])
+            X_test[noDates] = scaler.transform(X_test[noDates])
+            print('Datetime columns successfully excluded.')
+
+        else:
+            X_train = scaler.fit_transform(X_train)
+            X_test = scaler.transform(X_test)
+        '''
+        
+        # avoid errors, if data got not encoded:
+        if any(X_train.dtypes == 'string'):
+            noString = X_train.select_dtypes(exclude='string').columns # select only non-string columns to scale
+            X_train[noString] = scaler.fit_transform(X_train[noString])
+            X_test[noString] = scaler.transform(X_test[noString])
+            print('String columns successfully excluded.')
+
+        else:
+            X_train = scaler.fit_transform(X_train)
+            X_test = scaler.transform(X_test)
+        
+
+        #convert np arrays to pandas df to keep col names
+        X_train = pd.DataFrame(X_train, columns=X_cols)
+        X_test = pd.DataFrame(X_test, columns=X_cols)
+        print('Features sucessfully scaled.')
+        return X_train, X_test
+    
+    else:
+        print('scale or scaler not set.')
+    
+    
+#_________________________________________________________________________________________________________________________
+
+
+
 
 #_________________________________________________________________________________________________________________________
 
@@ -1061,34 +1128,17 @@ def create_train_test(df,
     
 #_________________________________________________________________________________________________________________________
 
-# make predictions & evaluate
-def eval_model(model, X_train , X_test , data= 'all', norm_CM = 'true'):
+
+#_________________________________________________________________________________________________________________________
+
+       
+#_________________________________________________________________________________________________________________________
+
+ # copy to churn_helpers and remove, if not changed anymore
+def param_summary(prepro_params = prepro_params, split_params = split_params, scaling_params = scaling_params):
     '''
-    Creates confusion matrix and classification reports for input model and returns predictions for X_train & X_test.
-    
-    input:
-    - model
-    - X_train
-    - X_test
-    - data: 'train' / 'test' / 'all' (default: 'all') --> decides for which X data classification reports will be printed
-    - normalize{‘true’, ‘pred’, ‘all’, None}, default='true'
-        -> Either to normalize the counts display in the matrix:
-            if 'true', the confusion matrix is normalized over the true conditions (e.g. rows);
-            if 'pred', the confusion matrix is normalized over the predicted conditions (e.g. columns);
-            if 'all', the confusion matrix is normalized by the total number of samples;
-            if None, the confusion matrix will not be normalized.
-    
-    print:
-    - selected parameters for preprocessing, train-test-split and scaling
-    - classification report
-    - confustion matrix
-    
-    return: y_pred_train, y_pred_test
+    print all selected parameters
     '''
-    print('selected model:',model.__class__.__name__)
-    print('_________________________________________________________\n')
-    
-    #print all selected parameters
     if prepro_params:
         print('selected preprocessing parameters:')
         for param_name, param_value in prepro_params.items():
@@ -1105,45 +1155,123 @@ def eval_model(model, X_train , X_test , data= 'all', norm_CM = 'true'):
             print(f'{param_name} = {param_value}')
         print('_________________________________________________________\n')
     
+#_________________________________________________________________________________________________________________________
+
+# copy to churn_helpers and remove, if not changed anymore
+def model_summary(model , y_train = y_train, y_test = y_test, ds_target = ds_target, filename = filename, scale=scale, scaler = scaler):
+    
+    #print model
+    print('selected model:',model.__class__.__name__)
+    
+    # print target
+    if ds_target:
+        print('selected target: ds_terminated with ds_reasons =', ds_reasons)
+    else:
+        print('selected target: terminated')
+    print('selected preprocessing file:',filename)
+    
+    #print encoder
+    try:
+        print('Encoded by:',encoder.__class__.__name__)
+    except:
+        print('Encoded by: GetDummies')
+    
+    # print normalizer
+    if scale:
+        print('Normalized by',scaler.__class__.__name__)
+    
+    # print split-type
+    if split_by_date:
+        print('train & test data splitted by date')
+    else:
+        print('train & test data splitted randomly')
+    
+    # print target ratio
+    train_ratio = y_train.mean()
+    test_ratio = y_test.mean()
+    print(f'ratio of positive class within train data: {train_ratio:.1%} and test data {test_ratio:.1%}')
+    print('_________________________________________________________\n')
+
+
+#_________________________________________________________________________________________________________________________
+
+# copy to churn_helpers and remove, if not changed anymore
+def eval_model(model, X_train , X_test , y_train = y_train, y_test = y_test, data= 'all',plot_CM = True, norm_CM = 'true',model_infos = True, ds_target = ds_target, filename = filename, scale=scale, scaler = scaler, split_by_date = split_by_date):
+    '''
+    Creates confusion matrix and classification reports for input model and returns predictions for X_train & X_test.
+    
+    input:
+    - model
+    - X_train
+    - X_test
+    - data: 'train' / 'test' / 'all' (default: 'all') --> decides for which X data classification reports will be printed
+    - plot_CM = True (True / False) --> plot Confusion Matrix
+    - normalize{‘true’, ‘pred’, ‘all’, None}, default='true'
+        -> Either to normalize the counts display in the matrix:
+            if 'true', the confusion matrix is normalized over the true conditions (e.g. rows);
+            if 'pred', the confusion matrix is normalized over the predicted conditions (e.g. columns);
+            if 'all', the confusion matrix is normalized by the total number of samples;
+            if None, the confusion matrix will not be normalized.
+    - model_infos = True --> decide to plot infos about data prepro & model
+        
+    print:
+    - selected parameters for preprocessing, train-test-split and scaling
+    - classification report
+    - confustion matrix
+    
+    return: y_pred_train, y_pred_test
+    '''
+    #summary of selected options:
+    if model_infos:
+        model_summary(model, y_train, y_test)
+    
     # create predictions
     y_pred_train = model.predict(X_train)
     y_pred_test = model.predict(X_test)
     
     if data == 'train':
-        print('CM & classification_report for train data:\n\n', classification_report(y_train, y_pred))
-        ConfusionMatrixDisplay.from_estimator(model, X_train, y_train, normalize=norm_CM)
-        plt.title(f'Confusion Matrix of Train Data. Normalized by: {norm_CM}')
+        print('Classification Report for train data:\n\n', classification_report(y_train, y_pred))
+        if plot_CM:
+            ConfusionMatrixDisplay.from_estimator(model, X_train, y_train, normalize=norm_CM)
+            plt.title(f'Confusion Matrix of Train Data. Normalized by: {norm_CM}')
     elif data == 'test':
         y_pred = model.predict(X_test)
-        print('CM & classification_report for test data:\n\n', classification_report(y_test, y_pred))
-        ConfusionMatrixDisplay.from_estimator(model, X_test, y_test, normalize=norm_CM)
-        plt.title(f'Confusion Matrix of Test Data. Normalized by: {norm_CM}')
+        print('Classification Report for test data:\n\n', classification_report(y_test, y_pred))
+        print('F1 score on test set:', f1_score(y_test, y_pred_test).round(2))
+        if plot_CM:
+            ConfusionMatrixDisplay.from_estimator(model, X_test, y_test, normalize=norm_CM)
+            plt.title(f'Confusion Matrix of Test Data. Normalized by: {norm_CM}')
     elif data == 'all':
-        fig, axes = plt.subplots(1,2, sharey=True)
-        plt.suptitle(f'Confusion Matrix. Normalized by: {norm_CM}')
-        print('CM & classification_report for train data:\n\n',classification_report(y_train, y_pred_train))
-        
-        ConfusionMatrixDisplay.from_estimator(model, X_train, y_train, normalize=norm_CM, ax=axes[0])
-        axes[0].set_title(f'Train Data')
+        print('Classification Report for train data:\n\n',classification_report(y_train, y_pred_train))
         print('_________________________________________________________\n')
-        print('CM & classification_report for test data:\n\n', classification_report(y_test, y_pred_test))
-        ConfusionMatrixDisplay.from_estimator(model, X_test, y_test, normalize=norm_CM, ax = axes[1])
-        axes[1].set_title(f'Test Data')
+        print('Classification Report for test data:\n\n', classification_report(y_test, y_pred_test))
+        print('F1 score on test set:', f1_score(y_test, y_pred_test).round(2))
+
+        if plot_CM:
+            fig, axes = plt.subplots(1,2, sharey=True)
+            plt.suptitle(f'Confusion Matrix. Normalized by: {norm_CM}')
+            ConfusionMatrixDisplay.from_estimator(model, X_train, y_train, normalize=norm_CM, ax=axes[0])
+            axes[0].set_title(f'Train Data')
+            ConfusionMatrixDisplay.from_estimator(model, X_test, y_test, normalize=norm_CM, ax = axes[1])
+            axes[1].set_title(f'Test Data')
     else:
         print('data value not set correctly')
     return y_pred_train, y_pred_test
-#_________________________________________________________________________________________________________________________
+       
 
-# def function
-def shap_create_and_summary(model, data = X_train, plot = 'summary', example = None):
+#_________________________________________________________________________________________________________________________
+    
+# copy to churn_helpers and remove, if not changed anymore
+def shap_create_and_summary(model, data = X_train, plot = 'summary', example = None, model_infos = True,y_train = y_train, y_test = y_test, scale=scale, scaler = scaler, split_by_date = split_by_date,Explainer = 'Explainer'):
     '''
     creates shap explainer and plots summary
     
     input:
     - model
     - data: X_train, X_test (default = X_train)
-    - plot: kind of plot ('summary' / 'bar' / 'beeswarm')
-    - example: plot example for this sample (optional)
+    - plot: kind of plot ('summary' / 'bar' / 'beeswarm', default = 'summary')
+    - example: plot example for this sample (default: None)
+    - model_infos: decide to plot infos about data prepro & model (default = True)
     
     return:
     explainer, shap_values
@@ -1153,7 +1281,12 @@ def shap_create_and_summary(model, data = X_train, plot = 'summary', example = N
     '''
     # Get Shap Values
     
-    explainer = shap.Explainer(model=model)
+    # initiate explainer
+    if Explainer == 'Explainer':
+        explainer = shap.Explainer(model=model)
+    elif Explainer == 'TreeExplainer':
+        explainer = shap.TreeExplainer(model=model) 
+
     shap_values = explainer(data)
     
     #reshape shap values, if they are 3dim
@@ -1164,9 +1297,9 @@ def shap_create_and_summary(model, data = X_train, plot = 'summary', example = N
         base_values_first_col = shap_values_3d.base_values[:,0]
         shap_values = shap.Explanation(shap_values_first_col, base_values=base_values_first_col, data=data)
     
-    print(f'seleczed model: {model.__class__.__name__}')
-    print('selected preprocessing file:',filename)
-    print(f'most important features of model on train data:')    
+    #summary of selected options:
+    if model_infos:
+        model_summary(model, y_train, y_test)  
     
     if plot == 'summary':
         # Summary plot
@@ -1183,15 +1316,507 @@ def shap_create_and_summary(model, data = X_train, plot = 'summary', example = N
         shap.plots.waterfall(shap_values[example])
     
     return explainer, shap_values
+
+
+#_________________________________________________________________________________________________________________________
+
+#Function for uniformly results
+def get_F1test_and_time(model, TrainTestData):
+    '''
+    get & save f1-score on test & time to fit & predict 
+    
+    input: model, TrainTestData = (X_train, X_test, y_train, y_test)
+    
+    return: f1_test, elapsed_time
+    '''
+    
+    # Unzip TrainTestData
+    X_train, X_test, y_train, y_test = TrainTestData
+    
+    start_time = time.time() # Start the timer
+
+    # Fit the best model to the training data
+    model.fit(X_train, y_train)
+
+    # Make predictions on the test set using the best model
+    y_pred = model.predict(X_test)
+
+    # Calculate the F1 score
+    f1_test = f1_score(y_test, y_pred).round(2)
+
+    end_time = time.time() # Stop the timer
+    elapsed_time = np.round((end_time - start_time), 2)
+    print(f'Results of best {model.__class__.__name__} model on train data: F1 Score on Test Data = {f1_test} - Time for fit & predict: {elapsed_time} s')
+    
+    return f1_test, elapsed_time
+
+
+#_________________________________________________________________________________________________________________________
+
+#Function 2 for uniformly results
+def get_F1_and_time(model, TrainTestData):
+    '''
+    get & save f1-score on train & test & time to fit & predict 
+    
+    input: model, TrainTestData = (X_train, X_test, y_train, y_test)
+    
+    return: f1_test, elapsed_time    return f1_train, f1_test, elapsed_time    
+    
+    '''
+    
+    # Unzip TrainTestData
+    X_train, X_test, y_train, y_test = TrainTestData
+    
+    start_time = time.time() # Start the timer
+
+    # Fit the best model to the training data
+    model.fit(X_train, y_train)
+    
+    # Make predictions on the train set using the best model
+    y_pred = model.predict(X_train)
+
+    # Calculate the F1 score
+    f1_train = f1_score(y_train, y_pred).round(2)
+
+    # Make predictions on the test set using the best model
+    y_pred = model.predict(X_test)
+
+    # Calculate the F1 score
+    f1_test = f1_score(y_test, y_pred).round(2)
+
+    end_time = time.time() # Stop the timer
+    elapsed_time = np.round((end_time - start_time), 2)
+    print(f'Results of {model.__class__.__name__}:')
+    print(f'F1 Score on Train Data = {f1_train}')
+    print(f'F1 Score on Test Data = {f1_test}')
+    print(f'Time for fit & predict: {elapsed_time} s')
+    
+    return f1_train, f1_test, elapsed_time
+
+
+#_________________________________________________________________________________________________________________________
+
+def resample_df(df, target = 'ds_terminated', reduce_ratio = reduce_ratio, sample = 'over', plot_dist = True):
+    '''
+    resample df, plot old and new target distribution and return resampled df
+    
+    input: 
+    df = contracts 
+    target = 'ds_terminated' (target variable)
+    reduce_ratio = 2 (reduce count of class 0 by only this factor of the difference. for 3 --> difference is afterwards reduced by 1/3)
+    sample = 'over' (options: 'over', 'under')
+    plot_dist = True (If set to False distributions before and after wont get plotted)
+    
+    plot: counts of target variable before and after resampling
+    
+    return: df after resampling
+    '''
+
+    # Class count
+    count_class_0, count_class_1 = df[target].value_counts()
+
+    # reduce count of class 0 by only factor n of the difference
+    reduced_class_0 = int(count_class_1 + ((count_class_0 - count_class_1)/reduce_ratio))
+
+    # Divide by class
+    df_class_0 = df[df[target] == 0]
+    df_class_1 = df[df[target] == 1]
+
+    if sample == 'under':
+        df_class_0_under = df_class_0.sample(reduced_class_0)
+        df_new = pd.concat([df_class_0_under, df_class_1], axis=0)
+        decr = len(df_class_0_under) / len(df_class_0)
+        print(f'undersampled class 0 from {len(df_class_0)} to {len(df_class_0_under)}')
+        print(f'class 0 got undersampled by factor {int(decr)} to reduce imbalance within df by {1/reduce_ratio:.0%}')
+    elif sample == 'over':
+        df_class_1_over = df_class_1.sample(reduced_class_0, replace=True)
+        df_new = pd.concat([df_class_0, df_class_1_over], axis=0)
+        incr = len(df_class_1_over) / len(df_class_1)
+        print(f'oversampled class 1 from {len(df_class_1)} to {len(df_class_1_over)}')
+        print(f'class 1 got oversampled by factor {int(incr)} to reduce imbalance within df by {1/reduce_ratio:.0%}')
+    
+    if plot_dist:    
+        # Plot subplots
+        fig, (ax1,ax2) = plt.subplots(2,1, figsize = (15, 5), sharex=True)
+        plt.suptitle(f'Random {sample}sampling by ratio {reduce_ratio}')
+
+        # plot old distribution
+        df[target].value_counts().plot(kind='barh', title='Count before resampling',  ax=ax1)
+        ax1.set_ylabel(target)
+
+        # plot new distribution
+        df_new[target].value_counts().plot(kind='barh', title='Count after resampling',  ax=ax2)
+        ax2.set_ylabel(target);
+           
+    return df_new
        
 #_________________________________________________________________________________________________________________________
 
- 
+def plot_scores(f1_scores = {}):
+    # Extract keys and values
+    lists = sorted(f1_scores.items()) 
+    x, y = zip(*lists)
+
+    # Create a 2D line plot
+    plt.plot(x, y, marker='o', linestyle='-')
+    plt.title('F1-Scores on test data depending on the reduction of imbalance')
+    plt.xlabel('Factor of Reduction of imbalance between class 1 and 0 (1=100%)')
+    plt.ylabel('F1-Score on Test data')
+
+    # Find the maximum F1 score and its corresponding x-coordinate
+    max_f1_score = max(y)
+    max_x = x[y.index(max_f1_score)]
+
+    # Add a red dotted vertical line at the maximum
+    plt.axvline(x=max_x, color='red', linestyle='--')
+
+    # Add a red dotted horizontal line at the maximum
+    plt.axhline(y=max_f1_score, color='red', linestyle='--')
+
+    # Annotate the maximum F1 score on the plot (middle right, slightly lower)
+    plt.annotate(f'Max F1 Score: {max_f1_score:.2f}', xy=(max_x, max_f1_score), xytext=(max_x + 0.5, max_f1_score - 0.02),
+                 arrowprops=dict(arrowstyle="->", color='black'))
+
+    # Annotate the maximum imbalance reduction on the x-axis
+    plt.annotate(f'Max Imbalance Reduction: {max_x}', xy=(max_x, max_f1_score), xytext=(max_x, max_f1_score - 0.2),
+                 arrowprops=dict(arrowstyle="->", color='black'))
+
+    # Display the plot
+    plt.show()
+    
+    return max_x, max_f1_score
+
+
+#_________________________________________________________________________________________________________________________
+
+# copy to churn_helpers and remove, if not changed anymore
+def select_top_k_features(model, 
+                          X_train, 
+                          X_test,
+                          y_train = y_train, 
+                          y_test = y_test,
+                          k=5,
+                         Explainer = 'Explainer'):
+    '''
+    Uses shap to select top k features of train data based on a selected model and returns only these features in X_train, X_test.
+    
+    input:
+    - model  
+    - X_train (df)
+    - X_test (df) 
+    - k=5 (int, number of top features to be selected, must be in range(len(X_train.columns)))
+    - Explainer = 'Explainer' (Kind of shap explainer. Options: 'Explainer', 'TreeExplainer')
+    - y_train = y_train
+    - y_test = y_test,
+    
+    return: 
+    X_train, X_test
+    '''
+    #select top k features, if set correctly
+    if k in range(len(X_train.columns)):
+        #train model
+        model.fit(X_train, y_train)
+        
+        # initiate explainer
+        if Explainer == 'Explainer':
+            explainer = shap.Explainer(model=model)
+        elif Explainer == 'TreeExplainer':
+            explainer = shap.TreeExplainer(model=model) 
+        
+        shap_values = explainer(X_train)
+        
+        # Calculate feature importances using Shapley values
+        feature_importances = np.abs(shap_values.values).mean(axis=0)
+
+        # Sort features based on importance scores
+        sorted_features = X_train.columns[np.argsort(feature_importances)[::-1]]
+
+        # Select the top-k features
+        selected_features = sorted_features[:k].tolist()
+        
+        X_train_k = X_train[selected_features]
+        X_test_k = X_test[selected_features]
+        
+        print(f'X_train & X_test got reduced to main {k} features:\n{selected_features}')
+        print('_________________________________________________________\n')
+        
+        return X_train_k, X_test_k
+        
+    else:
+        print('k out of range')
+        return
+       
+#_________________________________________________________________________________________________________________________
+
+# copy to churn_helpers and remove, if not changed anymore
+def run_eval_model(model,
+                   X_train,
+                   X_test,
+                   y_train,
+                   y_test,                   
+                   eval_data = 'all',
+                  shap_data = 'all',
+                  shap_plot = 'bar',
+                  shap_example = None,
+                  model_infos = True,
+                  Explainer = 'Explainer'):
+    '''
+    create, train, evaluate & plot shap summary for selected model
+    
+    input:
+    - model ('xgboost', 'DecisionTree')
+    - X_train, X_test, y_train, y_test,
+    - eval_data = 'all' (other options: 'train', 'test', None) 
+    - shap_data = 'all' (other options: 'train', 'test')
+    - shap_plot = 'bar' (other options: 'summary', 'beeswarm')
+    - shap_example = None (other options: int in range(len(X_test)))
+    - model infos = True --> plots infos about prepro & model
+    #- sel_top_k_features = None (if set to k in range(len(contracts.columns)) only top k shap features of train data will be used)
+    '''
+        
+    #train model
+    model.fit(X_train, y_train)
+    
+    #evaluate
+    if eval_data:
+        eval_model(model=model, X_train = X_train, X_test = X_test, y_train= y_train, y_test=y_test, data= eval_data, plot_CM = False, model_infos = model_infos)
+    
+    #shap data 
+    if shap_data in ['train', 'all']:
+        print('shap values for X_train:')
+        explainer_train, shap_values_train = shap_create_and_summary(model, X_train, plot = shap_plot, example=shap_example, model_infos=False,y_train = y_train, y_test = y_test, Explainer = Explainer)
+    
+    if shap_data in ['test', 'all']:
+        print('shap values for X_test:')    
+        explainer_test, shap_values_test = shap_create_and_summary(model, X_test, plot = shap_plot, example=shap_example, model_infos=False,y_train = y_train, y_test = y_test, Explainer = Explainer)
+    return model
+
+#_________________________________________________________________________________________________________________________
+# Create a function to update the waterfall plot based on the selected value of n
+def update_waterfall_plot(n, shap_values = shap_values):
+    '''
+    plots waterfall for sample n
+    '''
+    print(f'Waterfall for sample {n}:\n')
+    shap.plots.waterfall(shap_values[n])
+      
     
 #_________________________________________________________________________________________________________________________
 
+def predict_top_n_terminated_contracts(model, input_df, n=10, active_only=False):
+    """
+    Predict the top n terminated contracts based on their termination probability.
 
-   
+    Args:
+    - model: Trained XGBoost classifier.
+    - input_df: DataFrame containing contract data and an 'activ' column (0 or 1).
+    - n: Number of top contracts to return.
+    - active_only: If True, only consider active contracts (activ=1).
+
+    Returns:
+    - DataFrame with ContractID and TerminationProbability for the top n terminated contracts.
+    - n rows of input df with highest probability (and dropped activ col)
+    
+    Example usage:
+    top_n_terminated, X_test_k_top_n = predict_top_n_terminated_contracts(model = xgb_top10, input_df = X_test_k, n=100, active_only=True)
+    """
+
+    # Filter active contracts if active_only is True
+    if active_only:
+        input_df = input_df[input_df['activ'] == 1]
+
+    # Extract features from the input data
+    features = input_df.drop(['activ'], axis=1)
+
+    # Get class probabilities using the XGBoost model
+    class_probabilities = model.predict_proba(features)  # This returns probabilities for both classes.
+
+    # Select the probabilities for class 1 (terminated)
+    termination_probabilities = class_probabilities[:, 1].round(3)
+
+    # Create a DataFrame with ContractID and TerminationProbability
+    result_df = pd.DataFrame({
+        'ContractID': input_df.index,
+        'TerminationProbability': termination_probabilities
+    })
+    
+    # Set ContractID as index
+    result_df.set_index('ContractID', inplace=True)
+
+    # Sort the DataFrame by termination probability in descending order
+    result_df = result_df.sort_values(by='TerminationProbability', ascending=False)
+
+    # Select the top n terminated contracts
+    top_n_terminated_contracts = result_df.head(n)
+    
+    # Select top n terminated contracts of input df
+    features_top_n = features.loc[top_n_terminated_contracts.index]
+
+    return top_n_terminated_contracts, features_top_n
+
+#_________________________________________________________________________________________________________________________
+
+def predict_probabilities(model, X_train, X_test):
+    """
+    Predict probabilities for X_train and X_test using the specified model.
+
+    Args:
+    - model: Trained XGBoost classifier.
+    - X_train: DataFrame containing features for the training data.
+    - X_test: DataFrame containing features for the testing data.
+
+    Returns:
+    - Tuple of two DataFrames:
+      1. DataFrame with probabilities for X_train.
+      2. DataFrame with probabilities for X_test.
+    """
+    
+    # Make predictions for the training data
+    train_probs = model.predict_proba(X_train)  # This returns probabilities for both classes.
+    
+    # Make predictions for the testing data
+    test_probs = model.predict_proba(X_test)  # This returns probabilities for both classes.
+    
+    # Create DataFrames with probability columns
+    train_prob_df = pd.DataFrame(train_probs, columns=['Probability_Class0', 'Probability_Class1'], index=X_train.index)
+    test_prob_df = pd.DataFrame(test_probs, columns=['Probability_Class0', 'Probability_Class1'], index=X_test.index)
+    
+    return train_prob_df, test_prob_df
+
+
+#_________________________________________________________________________________________________________________________
+
+
+
+
+#_________________________________________________________________________________________________________________________
+
+
+
+
+#_________________________________________________________________________________________________________________________
+
+def run_grid_search(model, param_grid, TrainTestData, scoring = 'f1', model_name = None):
+    '''
+    runs grid search and prints & returns results.
+    
+    input: 
+    - model (classifier)
+    - param_grid (Dict) 
+    - TrainTestData ( = (X_train, X_test, y_train, y_test))
+    - scoring = 'f1' 
+    - model_name = None (String, optional to name variables saved by joblib, if None model.__class__.__name__ is set)
+    
+    return best_model, grid_params, f1_grid, f1_train, f1_test, grid_time
+    '''
+    #extract TrainTestData
+    (X_train, X_test, y_train, y_test) = TrainTestData
+    
+    # Record the start time
+    start_time = time.time()
+
+    # Create the GridSearchCV object
+    grid_search = GridSearchCV(
+        estimator=model,
+        param_grid=param_grid,
+        scoring=scoring,  # Sf1
+        cv=cv,  # 3
+        verbose=2,
+        n_jobs=-1  # Use all available CPU cores
+    )
+
+    # Perform the grid search
+    grid_search.fit(X_train, y_train)
+
+    # Best score
+    f1_grid = grid_search.best_score_.round(2)
+
+    # Get the best model
+    best_model = grid_search.best_estimator_
+    
+    # Best Params
+    grid_params = grid_search.best_params_
+
+    # Fit the best model to the training data
+    best_model.fit(X_train, y_train)
+
+    # Make predictions on the train set using the best model
+    y_pred = best_model.predict(X_train)
+
+    # Calculate the F1 score
+    f1_train = f1_score(y_train, y_pred).round(2)
+
+    # Make predictions on the test set using the best model
+    y_pred = best_model.predict(X_test)
+
+    # Calculate the F1 score
+    f1_test = f1_score(y_test, y_pred).round(2)
+    
+    # Record the end time
+    end_time = time.time()
+    # Calculate the runtime
+    grid_time = np.round((end_time - start_time), 3)
+    
+    # model name
+    if not model_name:
+        model_name = model.__class__.__name__
+    
+    # Print results
+    print(f'Results for {model_name}:')
+    print("Best hyperparameters in GridSearch:",  grid_params)
+    print("Best F1 Score in GridSearch:", f1_grid)
+    print(f'F1 Score on Train Data = {f1_train}')
+    print(f'F1 Score on Test Data = {f1_test}')
+    print("---run time for GridSearch, fit & predict = %s seconds ---" % grid_time)
+
+    # Save each variable with a specific filename
+    save_variable(best_model, 'best_model_' + model_name)
+    save_variable(grid_params, 'grid_params_' + model_name)
+    save_variable(f1_grid, 'f1_grid_' + model_name)
+    save_variable(f1_train, 'f1_train_' + model_name)
+    save_variable(f1_test, 'f1_test_' + model_name)
+    save_variable(grid_time, 'grid_time_' + model_name)
+
+    return best_model, grid_params, f1_grid, f1_train, f1_test, grid_time
+       
+#_________________________________________________________________________________________________________________________
+
+# helpers to save & load variables
+
+#_________________________________________________________________________________________________________________________
+
+def save_variable(variable, filename, subfolder='variables/'):
+    '''
+    save variable as .pkl file in subfolder
+    
+    input: variable, filename, subfolder='variables/'
+    
+    return: None
+    '''
+    file_path = f'{subfolder}{filename}.pkl'
+    joblib.dump(variable, file_path)
+    print(f'{filename}.pkl saved to {subfolder}')       
+    
+#_________________________________________________________________________________________________________________________
+def load_variable(var_name, subfolder='variables/'):
+    '''
+    load variable, if its var_name exists as .pkl file in subfolder.
+    
+    input: var_name (string)
+    
+    return: var
+    '''
+    # Define the file path where the variables should be saved
+    filename = subfolder + var_name + '.pkl'
+
+    # if files exist: load
+    if not os.path.exists(filename):
+        print(filename, 'not found.')
+    else:
+        # Load the pre-trained variables if it already exists
+        var = joblib.load(filename)
+        print(filename, 'loaded.')
+        return var 
        
 #_________________________________________________________________________________________________________________________
 
