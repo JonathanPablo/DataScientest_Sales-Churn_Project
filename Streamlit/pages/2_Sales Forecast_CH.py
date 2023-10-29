@@ -18,6 +18,8 @@ from PIL import Image
 
 import helpers_time_series as hts
 
+import os
+
 
 
 df = pd.read_csv('SalesData_preprocessed.csv',encoding='latin-1')
@@ -162,7 +164,7 @@ if add_radio == "Modelling":
 
                 df_2 = hts.choose_Zone(df_2, zoneUnited=None)
                 df_grouped = hts.group_df_per_month(df_2, '2023-01-01')
-                #image = Image.open('old_model_zone.png')
+                #image = Image.open('../plotly/old_model_zone.png')
                 #st.write(df_grouped.head())
                 if model != "SARIMA":
 
@@ -184,11 +186,11 @@ if add_radio == "Modelling":
                             y_test_pred = mlr_model.predict(X_test)
                             evaluation_results = hts.evaluate_regression_model(mlr_model, X_train, y_train, X_test, y_test)
                             st.write(evaluation_results)
-                            image = Image.open('ml_mlr.png')
+                            image = Image.open('plotly/ml_mlr.png')
                             st.image(image, caption='Multiple Lineare Regression')
                         if output == "Forecast 6 months":
                             st.subheader("Forecast:")
-                            image = Image.open('ml_mlr_forecst.png')
+                            image = Image.open('plotly/ml_mlr_forecst.png')
                             st.image(image, caption='Random Forest Regressor Forecast')
 
                     if model == "XGBoost":
@@ -209,11 +211,11 @@ if add_radio == "Modelling":
                             y_test_pred = xgboost_model.predict(X_test)
                             evaluation_results = hts.evaluate_regression_model(xgboost_model, X_train, y_train, X_test, y_test)
                             st.write(evaluation_results)
-                            image = Image.open('xgboost.png')
+                            image = Image.open('../plotly/xgboost.png')
                             st.image(image, caption='XGBoost')
                         if output == "Forecast 6 months":
                             st.subheader("Forecast:")
-                            image = Image.open('xgboost_forecast.png')
+                            image = Image.open('../plotly/xgboost_forecast.png')
                             st.image(image, caption='XGBoost Forecast')
 
                     if model == "Random Forest Regressor":
@@ -238,7 +240,7 @@ if add_radio == "Modelling":
                             st.image(image, caption='Random Forest Regressor')
                         if output == "Forecast 6 months":
                             st.subheader("Forecast:")
-                            image = Image.open('rf_forecast.png')
+                            image = Image.open('../plotly/rf_forecast.png')
                             st.image(image, caption='Random Forest Regressor Forecast')
                 else:
                     import statsmodels.api as sm
@@ -271,11 +273,11 @@ if add_radio == "Modelling":
                         y_test_sarima_pred = sarima.predict(test_sarima.index.min(), test_sarima.index.max())
                         evaluation_results = sarima.summary()
                         st.write(evaluation_results)
-                        image = Image.open('sarima.png')
+                        image = Image.open('plotly/sarima.png')
                         st.image(image, caption='SARIMA')
                     if output == "Forecast 6 months":
                         st.subheader("Forecast:")
-                        image = Image.open('sarima_forecast.png')
+                        image = Image.open('plotly/sarima_forecast.png')
                         st.image(image, caption='SARIMA Forecast')
 
            if zone_united == 'New Model Zone':
@@ -305,11 +307,11 @@ if add_radio == "Modelling":
                            evaluation_results = hts.evaluate_regression_model(mlr_model, X_train, y_train, X_test,
                                                                               y_test)
                            st.write(evaluation_results)
-                           image = Image.open('ml_mlr_oz.png')
+                           image = Image.open('plotly/ml_mlr_oz.png')
                            st.image(image, caption='Multiple Lineare Regression')
                        if output == "Forecast 6 months":
                            st.subheader("Forecast:")
-                           image = Image.open('ml_mlr_forecst_oz.png')
+                           image = Image.open('plotly/ml_mlr_forecst_oz.png')
                            st.image(image, caption='Random Forest Regressor Forecast')
 
                    if model == "XGBoost":
@@ -331,11 +333,11 @@ if add_radio == "Modelling":
                            evaluation_results = hts.evaluate_regression_model(xgboost_model, X_train, y_train, X_test,
                                                                               y_test)
                            st.write(evaluation_results)
-                           image = Image.open('xgboost_oz.png')
+                           image = Image.open('plotly/xgboost_oz.png')
                            st.image(image, caption='XGBoost')
                        if output == "Forecast 6 months":
                            st.subheader("Forecast:")
-                           image = Image.open('xgboost_forecast_oz.png')
+                           image = Image.open('plotly/xgboost_forecast_oz.png')
                            st.image(image, caption='XGBoost Forecast')
 
                    if model == "Random Forest Regressor":
@@ -358,11 +360,11 @@ if add_radio == "Modelling":
                            evaluation_results = hts.evaluate_regression_model(rf_model, X_train, y_train, X_test,
                                                                               y_test)
                            st.write(evaluation_results)
-                           image = Image.open('rf_oz.png')
+                           image = Image.open('plotly/rf_oz.png')
                            st.image(image, caption='Random Forest Regressor')
                        if output == "Forecast 6 months":
                            st.subheader("Forecast:")
-                           image = Image.open('rf_forecast_oz.png')
+                           image = Image.open('plotly/rf_forecast_oz.png')
                            st.image(image, caption='Random Forest Regressor Forecast')
                else:
                    import statsmodels.api as sm
@@ -395,11 +397,11 @@ if add_radio == "Modelling":
                        y_test_sarima_pred = sarima.predict(test_sarima.index.min(), test_sarima.index.max())
                        evaluation_results = sarima.summary()
                        st.write(evaluation_results)
-                       image = Image.open('sarima_oz.png')
+                       image = Image.open('plotly/sarima_oz.png')
                        st.image(image, caption='SARIMA')
                    if output == "Forecast 6 months":
                        st.subheader("Forecast:")
-                       image = Image.open('sarima_forecast_oz.png')
+                       image = Image.open('plotly/sarima_forecast_oz.png')
                        st.image(image, caption='SARIMA Forecast')
 
 
