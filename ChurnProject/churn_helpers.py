@@ -48,7 +48,7 @@ import joblib
 #_________________________________________________________________________________________________________________________
 #initiate variables to avoid erros:
 X_train, X_test, y_train, y_test = (0,0,0,0)
-prepro_params, split_params, scaling_params, ds_target, filename, reduce_ratio, scale, scaler, eval_data, split_by_date, Explainer, shap_values = None, None, None, None, None, None, None, None, None, None, None, None
+prepro_params, split_params, scaling_params, ds_target, filename, reduce_ratio, scale, scaler, eval_data, split_by_date, Explainer, shap_values, cv = None, None, None, None, None, None, None, None, None, None, None, None, None
 
 #_________________________________________________________________________________________________________________________
 
@@ -608,26 +608,29 @@ def encode_contracts(df, use_regions= True):
     # Import function 'country_to_region_mapping' from helpers to create mapping dicts
     if use_regions == True:
         # load country_to_region_mapping, if not already exists
-        from churn_helpers import country_to_region_mapping 
-        print('country_to_region_mapping loaded')
+        #if not 'country_to_region_mapping' in locals():
+         #   from churn_helpers import country_to_region_mapping 
+          #  print('country_to_region_mapping loaded')
+            
+        if 'insured_nationality' in df.columns:
+            try:
+                # Create mapping dicts
+                nationISO_mapping = country_to_region_mapping(df.insured_nationality)
+                # replace nations regions before encoding
+                df['insured_nationRegion'] = df.insured_nationality.replace(nationISO_mapping)
+                df = df.drop(columns=['insured_nationality'])
+            except:
+                print('insured_nationality could not be mapped to region - column might already dropped or REST-API not available.')
 
-        try:
-            # Create mapping dicts
-            nationISO_mapping = country_to_region_mapping(df.insured_nationality)
-            # replace nations regions before encoding
-            df['insured_nationRegion'] = df.insured_nationality.replace(nationISO_mapping)
-            df = df.drop(columns=['insured_nationality'])
-        except:
-            print('insured_nationality could not be mapped to region - column might already dropped.')
-
-        try:
-            # Create mapping dicts
-            country_mapping = country_to_region_mapping(df.holder_country, iso= False)
-            # replace countries by regions before encoding
-            df['holder_Region'] = df.holder_country.replace(country_mapping)
-            df = df.drop(columns=['holder_country'])
-        except:
-            print('holder_country could not be mapped to region - column might already dropped.')
+        if 'holder_country' in df.columns:
+            try:
+                # Create mapping dicts
+                country_mapping = country_to_region_mapping(df.holder_country, iso= False)
+                # replace countries by regions before encoding
+                df['holder_Region'] = df.holder_country.replace(country_mapping)
+                df = df.drop(columns=['holder_country'])
+            except:
+                print('holder_country could not be mapped to region - column might already dropped or REST-API not available..')
 
     # 2.2 drop cols with too many values & little imporance
     df.drop(columns=['product_code'], inplace=True)
@@ -1353,7 +1356,7 @@ def get_F1test_and_time(model, TrainTestData):
 
 #_________________________________________________________________________________________________________________________
 
-#Function 2 for uniformly results
+#Function2 for uniformly results
 def get_F1_and_time(model, TrainTestData):
     '''
     get & save f1-score on train & test & time to fit & predict 
@@ -1386,12 +1389,13 @@ def get_F1_and_time(model, TrainTestData):
 
     end_time = time.time() # Stop the timer
     elapsed_time = np.round((end_time - start_time), 2)
-    print(f'Results of {model.__class__.__name__}:')
+    print(f'Results of best {model.__class__.__name__} model on train data:')
     print(f'F1 Score on Train Data = {f1_train}')
     print(f'F1 Score on Test Data = {f1_test}')
     print(f'Time for fit & predict: {elapsed_time} s')
     
     return f1_train, f1_test, elapsed_time
+
 
 
 #_________________________________________________________________________________________________________________________
@@ -1696,7 +1700,7 @@ def predict_probabilities(model, X_train, X_test):
 
 #_________________________________________________________________________________________________________________________
 
-def run_grid_search(model, param_grid, TrainTestData, scoring = 'f1', model_name = None):
+def run_grid_search(model, param_grid, TrainTestData, scoring = 'f1', cv = 3, model_name = None):
     '''
     runs grid search and prints & returns results.
     
