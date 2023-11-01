@@ -7,4 +7,9 @@ The goal of this sub-project is to predict if (/probability that) a contract wil
 
 Therefore different kinds of contract related information were extracted from the ERP System SAP B1 and processed in SQL to create a pseudonimised csv file with features per contract.
 
-Samples of SAP and the preprocessing in SQL can be tracked in __[images/ERP-System+SQL](/ChurnProject/images/ERP-System%2BSQL)__
+About the content:
+- Samples of SAP and the preprocessing in SQL can be tracked in the subfolders __[images/ERP-System+SQL](/ChurnProject/images/ERP-System%2BSQL)__ and __[SQL](/ChurnProject/SQL)__.
+- In __[images](/ChurnProject/images)__ screenshots and plots from dataviz & modelling can be found.
+- 
+
+
