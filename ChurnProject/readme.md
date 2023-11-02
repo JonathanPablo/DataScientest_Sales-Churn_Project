@@ -21,7 +21,7 @@ The data got then further processed in 2 Jupyter Notebooks:
   -  Probability predictions with XGBoost, interpretation with SHAP.
 
 ## Results
-Main preprocessing steps, data visualisations and modeelling results & improvements can be found in the __[Final Report](/Sales Forecast and Churn Prediction_Final Report.docx)__ as well as conclusions and occured problems.
+Main preprocessing steps, data visualisations and modeelling results & improvements can be found in the __[Final Report](</Sales Forecast and Churn Prediction_Final Report.docx>)__ as well as conclusions and occured problems.
 
 ## Additional content
 Addition content is included in the subfolders:
