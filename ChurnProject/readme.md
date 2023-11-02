@@ -13,15 +13,19 @@ Therefore different kinds of contract related information were extracted from th
 The data got then further processed in 2 Jupyter Notebooks:
 1. __[Churn_Introduction+DataExploration](/ChurnProject/Churn_Introduction%2BDataExploration.ipynb)__:
   - Introduction, first Overview, Data Exploration and first Modelling attempt to get main features with DecisionTree.
+![Data Exploration Examples](https://github.com/JonathanPablo/DataScientest_Sales-Churn_Project/assets/134729968/5b887bcd-3251-4992-bc76-14a53251cb0a)
 
 2. __[Churn_Preprocessing+Modelling](/ChurnProject/Churn_Preprocessing%2BModelling.ipynb)__:
   - Data Cleaning & Preprocessing, Data Visualisation & further exploration of correlations, cistributions & Co.
   - Train- & Test-Data creation, including alternative target variable for specific termination reasons only.
   - Classification predictions with XGBoost-, SupportVector- & RandomForest-Classifier on both target variables. Tuning attempts, comparison & interpretation with SHAP.
   -  Probability predictions with XGBoost, interpretation with SHAP.
+  -  For all steps functions were defined and ecluded into __[churn_helpers](/ChurnProject/churn_helpers.py)__
+![Modelling Examples](https://github.com/JonathanPablo/DataScientest_Sales-Churn_Project/assets/134729968/3f2b57c6-ce0e-45d4-be61-477e9daac2f1)
+
 
 ## Results
-Main preprocessing steps, data visualisations and modeelling results & improvements can be found in the __[Final Report](</Sales Forecast and Churn Prediction_Final Report.docx>)__ as well as conclusions and occured problems.
+In Chapter III of the __[Final Report](</Sales Forecast and Churn Prediction_Final Report.docx>)__ main preprocessing steps, data visualisations and modeelling results & improvements can be found as well as challenges and a conclusion.
 
 ## Additional content
 Addition content is included in the subfolders:
