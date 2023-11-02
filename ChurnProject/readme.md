@@ -21,7 +21,7 @@ The data got then further processed in 2 Jupyter Notebooks:
   - Train- & Test-Data creation, including alternative target variable for specific termination reasons only.
   - Classification predictions with XGBoost-, SupportVector- & RandomForest-Classifier on both target variables. Tuning attempts, comparison & interpretation with SHAP.
   -  Probability predictions with XGBoost, interpretation with SHAP.
-  -  For all steps functions were defined and ecluded into __[churn_helpers](/ChurnProject/churn_helpers.py)__
+  -  For all steps a lot of functions have been defined and ecluded into __[churn_helpers](/ChurnProject/churn_helpers.py)__
 ![Modelling Examples](https://github.com/JonathanPablo/DataScientest_Sales-Churn_Project/assets/134729968/3f2b57c6-ce0e-45d4-be61-477e9daac2f1)
 
 
