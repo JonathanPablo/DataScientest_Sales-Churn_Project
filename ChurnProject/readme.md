@@ -34,5 +34,6 @@ Addition content is included in the subfolders:
 - In __[images](/ChurnProject/images)__ screenshots and plots from dataviz & modelling can be found.
 - __[preprocessed](/ChurnProject/preprocessed)__ contains different variations of preprocessed data.
 - In __[variables](/ChurnProject/variables)__ especially GridSearch results were saved as variables to save time when rerunning the kernel.
+- __[3_Churn_Prediction](/ChurnProject/3_Churn_Prediction.py)__ includes a first attempt of a streamlit demo of preprocessing and modelling.
 
 
