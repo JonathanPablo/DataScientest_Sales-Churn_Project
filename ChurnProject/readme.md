@@ -21,7 +21,7 @@ The data got then further processed in 2 Jupyter Notebooks:
   - Train- & Test-Data creation, including alternative target variable for specific termination reasons only.
   - Classification predictions with XGBoost-, SupportVector- & RandomForest-Classifier on both target variables. Tuning attempts, comparison & interpretation with SHAP.
   -  Probability predictions with XGBoost, interpretation with SHAP.
-  -  For all steps a lot of functions have been defined and ecluded into __[churn_helpers](/ChurnProject/churn_helpers.py)__
+  -  For all steps a lot of functions have been defined and ecluded into __[churn_helpers.py](/ChurnProject/churn_helpers.py)__
 ![Modelling Examples](https://github.com/JonathanPablo/DataScientest_Sales-Churn_Project/assets/134729968/3f2b57c6-ce0e-45d4-be61-477e9daac2f1)
 
 
@@ -34,6 +34,6 @@ Addition content is included in the subfolders:
 - In __[images](/ChurnProject/images)__ screenshots and plots from dataviz & modelling can be found.
 - __[preprocessed](/ChurnProject/preprocessed)__ contains different variations of preprocessed data.
 - In __[variables](/ChurnProject/variables)__ especially GridSearch results were saved as variables to save time when rerunning the kernel.
-- __[3_Churn_Prediction](/ChurnProject/3_Churn_Prediction.py)__ includes a first attempt of a streamlit demo of preprocessing and modelling.
+- __[3_Churn_Prediction.py](/ChurnProject/3_Churn_Prediction.py)__ includes a first attempt of a streamlit demo of preprocessing and modelling.
 
 
