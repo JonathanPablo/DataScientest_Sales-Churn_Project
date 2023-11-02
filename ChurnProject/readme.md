@@ -13,7 +13,8 @@ Therefore different kinds of contract related information were extracted from th
 The data got then further processed in 2 Jupyter Notebooks:
 1. __[Churn_Introduction+DataExploration](/ChurnProject/Churn_Introduction%2BDataExploration.ipynb)__:
   - Introduction, first Overview, Data Exploration and first Modelling attempt to get main features with DecisionTree.
-![Data Exploration Examples](https://github.com/JonathanPablo/DataScientest_Sales-Churn_Project/assets/134729968/5b887bcd-3251-4992-bc76-14a53251cb0a)
+![Data Exploration Examples](https://github.com/JonathanPablo/DataScientest_Sales-Churn_Project/assets/134729968/ef809f79-d05a-436d-bb6e-a9c75de08d77)
+
 
 2. __[Churn_Preprocessing+Modelling](/ChurnProject/Churn_Preprocessing%2BModelling.ipynb)__:
   - Data Cleaning & Preprocessing, Data Visualisation & further exploration of correlations, cistributions & Co.
