@@ -1,5 +1,5 @@
 # DataScientest Project: Sales- & Churn-prediction of health-insurance data
-This repo shows the summary of a project during the course 'Data Science Continuous Mar23' of DataScientest.
+This repo shows the summary of a project during the course 'Data Science Continuous Mar23' of DataScientest. <br>
 The project works with real data from a company specialized on international health insurance products. The data comes directly from the companies ERP System and contains contract- as well as premium- & claims-related informations in pseudonymised form.
 
 ## Introduction
