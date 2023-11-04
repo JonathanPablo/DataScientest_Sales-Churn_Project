@@ -12,8 +12,8 @@ Initially 2 main goals were defined:
 During the project, the project group faced the problem of a limited number of features which are known for the future. Therefore, it was decided on project extension with the further objective, namely churn predictions. The contracts’ data for all products was taken and enriched by additional, information from the ERP-System. 
 
 Withing this sub-project another 2 goals were defined:
-  3.	Identify main features that have an impact on customers’ termination behaviour
-  4.	Find active contracts that are more likely to get terminated by the customer
+  2.1	Identify main features that have an impact on customers’ termination behaviour
+  2.2	Find active contracts that are more likely to get terminated by the customer
 
 More Information can be found in detailled form in the __[Final Report](</Sales Forecast and Churn Prediction_Final Report.docx>)__.
 
