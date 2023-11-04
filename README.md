@@ -1,11 +1,24 @@
 # DataScientest Project: Sales- & Churn-prediction of health-insurance data
-Collective Repo for all sub-projects of this DataScientest-Project...
+This repo shows the summary of a project during the course 'Data Science Continuous Mar23' of DataScientest.
+The project works with real data from a company specialized on international health insurance products. The data comes directly from the companies ERP System and contains contract- as well as premium- & claims-related informations in pseudonymised form.
 
 ## Introduction
-Here will be a main introduction to the project... including pictures..
+The main objective was to create the best performing model for sales predictions, in particularly prediction of premium amounts per month. Due to the big variety of product characteristics, only transactions concerning one main product type were considered to build a prototype.
+
+Initially 2 main goals were defined:
+1.	Find the best model for forecasting / predicting the premium amount
+2.	Find out how premium adjustments impact the value of premium amount 
+
+During the project, the project group faced the problem of a limited number of features which are known for the future. Therefore, it was decided on project extension with the further objective, namely churn predictions. The contracts’ data for all products was taken and enriched by additional, information from the ERP-System. 
+
+Withing this sub-project another 2 goals were defined:
+3.	Identify main features that have an impact on customers’ termination behaviour
+4.	Find active contracts that are more likely to get terminated by the customer
+
+More Information can be found in detailled form in the __[Final Report](</Sales Forecast and Churn Prediction_Final Report.docx>)__.
 
 ## First Sub-Project: Sales Forecast
-Here will be a short description and link to the readme of this sub project.
+An Overview about the Sales Forecast project can be found in the __[SalesProject](/SalesProject)__ folder and in Chapter II of the __[Final Report](</Sales Forecast and Churn Prediction_Final Report.docx>)__.
 
 ## Second Sub-Project: Churn Predictions
 An Overview about the Churn Prediction project can be found in the __[ChurnProject](/ChurnProject)__ folder and in Chapter III of the __[Final Report](</Sales Forecast and Churn Prediction_Final Report.docx>)__.
