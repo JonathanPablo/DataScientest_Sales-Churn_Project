@@ -21,7 +21,7 @@ More Information can be found in detailled form in the __[Final Report](</Sales 
 An Overview about the Sales Forecast project can be found in the __[SalesProject](/SalesProject)__ folder and in Chapter II of the __[Final Report](</Sales Forecast and Churn Prediction_Final Report.docx>)__.
 
 ## Second Sub-Project: Churn Predictions
-An Overview about the Churn Prediction project can be found in the __[ChurnProject](/ChurnProject)__ folder and in Chapter III of the __[Final Report](</Sales Forecast and Churn Prediction_Final Report.docx>)__.
+An Overview about the Churn Prediction project can be found in the __[ChurnProject](/ChurnProject)__ folders readme and in Chapter III of the __[Final Report](</Sales Forecast and Churn Prediction_Final Report.docx>)__.
 
 ## Historical Repos of Sub-Projects
 In these repos old versions and historical attempts on the projects can be found:
