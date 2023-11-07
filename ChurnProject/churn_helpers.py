@@ -780,24 +780,28 @@ def plot_target_dist(df, target, df_title):
     '''
     input:
     - df (df)
-    - tagret (col name) --> "terminated" ( "ds_terminated") 
+    - target (col name) --> "terminated" ( "ds_terminated") 
     
     plots pie chart & values of target value distribution in df.
     '''
     df = df[target]
+    labels = df.value_counts().index.tolist()
     
-    plt.figure(figsize= (10, 5))
+    # Define colors for label 0 and label 1
+    colors = ['#88c3ed', '#ff6666']
+
+    plt.figure(figsize=(10, 5))
     plt.pie(df.value_counts(),
-                        autopct = '%.1f',
-                        explode = [0.1,0],
-                        labels = df.unique().tolist(),
-                        shadow = True, 
-                        textprops = {'fontsize':10},
-                        colors = ['lightblue', 'steelblue'],
-                        startangle = 180
+            autopct='%.1f',
+            explode=[0.1, 0],
+            labels=labels,
+            colors=[colors[i] for i in labels],  # Assign colors based on label values
+            shadow=True,
+            textprops={'fontsize': 10},
+            startangle=180
     )
-    plt.title(f'Ratio of: {target}-col in {df_title}', fontsize = 12)
-    #plt.legend(fontsize = 12, loc = 'upper right')
+    plt.title(f'Ratio of: {target}-col in {df_title}', fontsize=12)
+    # plt.legend(fontsize=12, loc='upper right')
     plt.show()
     print(df.value_counts())
 
@@ -1226,7 +1230,7 @@ def eval_model(model, X_train , X_test , y_train = y_train, y_test = y_test, dat
     '''
     #summary of selected options:
     if model_infos:
-        model_summary(model, y_train, y_test)
+        model_summary(model, y_train, y_test, ds_target = ds_target)
     
     # create predictions
     y_pred_train = model.predict(X_train)
@@ -1265,7 +1269,10 @@ def eval_model(model, X_train , X_test , y_train = y_train, y_test = y_test, dat
 #_________________________________________________________________________________________________________________________
     
 # copy to churn_helpers and remove, if not changed anymore
-def shap_create_and_summary(model, data = X_train, plot = 'summary', example = None, model_infos = True,y_train = y_train, y_test = y_test, scale=scale, scaler = scaler, split_by_date = split_by_date,Explainer = 'Explainer'):
+def shap_create_and_summary(model, data=X_train, plot='summary', example=None, model_infos=True,
+                            y_train=y_train, y_test=y_test, scale=scale, scaler=scaler,
+                            split_by_date=split_by_date, Explainer='Explainer', ds_target=ds_target,
+                            num_features=None):
     '''
     creates shap explainer and plots summary
     
@@ -1275,49 +1282,53 @@ def shap_create_and_summary(model, data = X_train, plot = 'summary', example = N
     - plot: kind of plot ('summary' / 'bar' / 'beeswarm', default = 'summary')
     - example: plot example for this sample (default: None)
     - model_infos: decide to plot infos about data prepro & model (default = True)
+    - num_features: Number of top features to include in the summary plot (default: None, which plots all features)
     
     return:
     explainer, shap_values
     
     example: 
-    xgb_explainer, xgb_shap_values = shap_create_and_summary(xgb_model)
+    xgb_explainer, xgb_shap_values = shap_create_and_summary(xgb_model, num_features=10)
     '''
     # Get Shap Values
-    
+
     # initiate explainer
     if Explainer == 'Explainer':
         explainer = shap.Explainer(model=model)
     elif Explainer == 'TreeExplainer':
-        explainer = shap.TreeExplainer(model=model) 
+        explainer = shap.TreeExplainer(model=model)
 
     shap_values = explainer(data)
-    
-    #reshape shap values, if they are 3dim
+
+    # reshape shap values, if they are 3dim
     if len(shap_values.shape) == 3:
         shap_values_3d = shap_values
         # Extract the first column of SHAP values
         shap_values_first_col = shap_values_3d.values[:, :, 0]
-        base_values_first_col = shap_values_3d.base_values[:,0]
+        base_values_first_col = shap_values_3d.base_values[:, 0]
         shap_values = shap.Explanation(shap_values_first_col, base_values=base_values_first_col, data=data)
-    
-    #summary of selected options:
+
+    # summary of selected options:
     if model_infos:
-        model_summary(model, y_train, y_test)  
-    
+        model_summary(model, y_train, y_test, ds_target)
+
     if plot == 'summary':
-        # Summary plot
-        shap.summary_plot(shap_values, data)
+        # Summary plot with specified number of features
+        if num_features is not None:
+            shap.summary_plot(shap_values, data, max_display=num_features)
+        else:
+            shap.summary_plot(shap_values, data)
     elif plot == 'bar':
-        #most important features
+        # most important features
         shap.plots.bar(shap_values)
     elif plot == 'beeswarm':
         shap.plots.beeswarm(shap_values)
-    
+
     # print example waterfall
     if example in range(len(data)):
         print(f'waterfall for sample {example}:\n')
         shap.plots.waterfall(shap_values[example])
-    
+
     return explainer, shap_values
 
 
