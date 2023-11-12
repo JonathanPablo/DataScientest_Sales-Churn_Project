@@ -6,6 +6,9 @@ The goal of this sub-project is to predict if (/probability that) a contract wil
 2. What are main global impacts on contract terminations?
 3. What are individual factors for customers to terminate their contracts?
 
+The classification problem can be described by the following ConfusionMatrix:
+![ConfusionMatrix](https://github.com/JonathanPablo/DataScientest_Sales-Churn_Project/assets/134729968/f3122fbc-f17c-47c4-b3fa-b525955dd29c)
+
 Therefore different kinds of contract related information were extracted from the ERP System SAP B1 and processed in SQL to create a pseudonimised csv file with features per contract. The most recent version is __[BDAE_DataMining_Policies_v2.csv](/ChurnProject/BDAE_DataMining_Policies_v2.csv)__.
 ![Data Collection Steps](https://github.com/JonathanPablo/DataScientest_Sales-Churn_Project/assets/134729968/bd8a03c6-9d32-47e8-af7d-ceb3ba21588a)
 
