@@ -48,7 +48,7 @@ import joblib
 #_________________________________________________________________________________________________________________________
 #initiate variables to avoid erros:
 X_train, X_test, y_train, y_test = (0,0,0,0)
-prepro_params, split_params, scaling_params, ds_target, filename, reduce_ratio, scale, scaler, eval_data, split_by_date, Explainer, shap_values, cv = None, None, None, None, None, None, None, None, None, None, None, None, None
+prepro_params, split_params, scaling_params, ds_target, filename, reduce_ratio, scale, scaler, eval_data, split_by_date, Explainer, shap_values, cv, encoder, ds_reasons, explainer, shap_data = None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
 
 #_________________________________________________________________________________________________________________________
 
@@ -351,7 +351,7 @@ def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = Tr
         
     if year_only == False:
         contracts['start_Month'] = contracts['policy_startDate'].dt.month
-        contracts['effEnd_Month'] = contracts['policy_startDate'].dt.month
+        contracts['effEnd_Month'] = contracts['policy_effEndDate'].dt.month
     #contracts.drop(columns=['policy_startDate','policy_effEndDate'], inplace=True) #drop later at train/test-split (to keep dataviz running for preprocessed df too)
         
             
@@ -1051,7 +1051,11 @@ def create_train_test(df,
     #optional: split by date:
     if split_by_date == True:
         df = df.sort_values(split_date_col, ascending = True)
-        df.drop(columns=['policy_startDate','policy_effEndDate'], inplace=True) # drop columns now to keep only year (& month)
+        for date in ['policy_startDate','policy_effEndDate']:
+            try:
+                df.drop(columns=[date], inplace=True) # drop columns now to keep only year (& month)
+            except:
+                print(date,'col already dropped')
         train_set, test_set= np.split(df, [int((1-test_size) *len(df))])
         X_train = train_set.drop(columns=term_cols)
         X_test = test_set.drop(columns=term_cols)
@@ -1062,7 +1066,11 @@ def create_train_test(df,
             y_train = train_set.terminated
             y_test = test_set.terminated
     else:
-        df.drop(columns=['policy_startDate','policy_effEndDate'], inplace=True) # drop columns now to keep only year (& month)
+        for date in ['policy_startDate','policy_effEndDate']:
+            try:
+                df.drop(columns=[date], inplace=True) # drop columns now to keep only year (& month)
+            except:
+                print(date,'col already dropped')
         if ds_target == True:
             y = df.ds_terminated
 
@@ -1165,7 +1173,7 @@ def param_summary(prepro_params = prepro_params, split_params = split_params, sc
 #_________________________________________________________________________________________________________________________
 
 # copy to churn_helpers and remove, if not changed anymore
-def model_summary(model , y_train = y_train, y_test = y_test, ds_target = ds_target, filename = filename, scale=scale, scaler = scaler):
+def model_summary(model , y_train = y_train, y_test = y_test, ds_target = ds_target, filename = filename, scale=scale, scaler = scaler,split_by_date = split_by_date, encoder = encoder, ds_reasons = ds_reasons):
     
     #print model
     print('selected model:',model.__class__.__name__)
@@ -1175,17 +1183,22 @@ def model_summary(model , y_train = y_train, y_test = y_test, ds_target = ds_tar
         print('selected target: ds_terminated with ds_reasons =', ds_reasons)
     else:
         print('selected target: terminated')
-    print('selected preprocessing file:',filename)
+    
+    if filename:
+        print('selected preprocessing file:',filename)
     
     #print encoder
     try:
-        print('Encoded by:',encoder.__class__.__name__)
+        print('Encoded by:', encoder.__class__.__name__)
     except:
         print('Encoded by: GetDummies')
     
     # print normalizer
     if scale:
-        print('Normalized by',scaler.__class__.__name__)
+        if scaler:
+            print('Normalized by',scaler.__class__.__name__)
+        else:
+            print('Normalized')
     
     # print split-type
     if split_by_date:
@@ -1202,8 +1215,13 @@ def model_summary(model , y_train = y_train, y_test = y_test, ds_target = ds_tar
 
 #_________________________________________________________________________________________________________________________
 
+
+
+#_________________________________________________________________________________________________________________________
+
+
 # copy to churn_helpers and remove, if not changed anymore
-def eval_model(model, X_train , X_test , y_train = y_train, y_test = y_test, data= 'all',plot_CM = True, norm_CM = 'true',model_infos = True, ds_target = ds_target, filename = filename, scale=scale, scaler = scaler, split_by_date = split_by_date):
+def eval_model(model, X_train , X_test , y_train = y_train, y_test = y_test, data= 'all',plot_CM = True, norm_CM = 'true',model_infos = True, ds_target = ds_target, filename = filename, scale=scale, scaler = scaler, split_by_date = split_by_date, encoder = encoder, ds_reasons = ds_reasons):
     '''
     Creates confusion matrix and classification reports for input model and returns predictions for X_train & X_test.
     
@@ -1230,7 +1248,7 @@ def eval_model(model, X_train , X_test , y_train = y_train, y_test = y_test, dat
     '''
     #summary of selected options:
     if model_infos:
-        model_summary(model, y_train, y_test, ds_target = ds_target)
+        model_summary(model, y_train, y_test, ds_target = ds_target,split_by_date = split_by_date, encoder = encoder, ds_reasons = ds_reasons)
     
     # create predictions
     y_pred_train = model.predict(X_train)
@@ -1529,6 +1547,7 @@ def select_top_k_features(model,
     '''
     #select top k features, if set correctly
     if k in range(len(X_train.columns)):
+        
         #train model
         model.fit(X_train, y_train)
         
@@ -1540,11 +1559,24 @@ def select_top_k_features(model,
         
         shap_values = explainer(X_train)
         
+        # reshape shap values, if they are 3dim
+        if len(shap_values.shape) == 3:
+            shap_values_3d = shap_values
+            # Extract the first column of SHAP values
+            shap_values_first_col = shap_values_3d.values[:, :, 0]
+            base_values_first_col = shap_values_3d.base_values[:, 0]
+            shap_values = shap.Explanation(shap_values_first_col, base_values=base_values_first_col, data=X_train)
+
+        
         # Calculate feature importances using Shapley values
         feature_importances = np.abs(shap_values.values).mean(axis=0)
+       
 
         # Sort features based on importance scores
-        sorted_features = X_train.columns[np.argsort(feature_importances)[::-1]]
+        #sorted_features = X_train.columns[np.argsort(feature_importances)[:,:-1]]
+        #sorted_features = X_train.columns[np.argsort(np.abs(feature_importances[:, 0]))[::-1]]
+        sorted_features = X_train.columns[np.argsort(np.abs(feature_importances))[::-1]]
+
 
         # Select the top-k features
         selected_features = sorted_features[:k].tolist()
@@ -1855,3 +1887,217 @@ class StreamlitPrintOutput:
         sys.stdout = self._stdout  # Restore the original stdout
 
 #print_output = StreamlitPrintOutput()
+
+#_________________________________________________________________________________________________________________________
+
+
+#_________________________________________________________________________________________________________________________
+
+# copy to churn_helpers and remove, if not changed anymore
+def eval_model_st(model, X_train , X_test , y_train = y_train, y_test = y_test, data= 'all',plot_CM = True, norm_CM = 'true',model_infos = True, ds_target = ds_target, filename = filename, scale=scale, scaler = scaler, split_by_date = split_by_date, encoder = encoder, ds_reasons = ds_reasons):
+    '''
+    Creates confusion matrix and classification reports for input model and returns predictions for X_train & X_test.
+    
+    input:
+    - model
+    - X_train
+    - X_test
+    - data: 'train' / 'test' / 'all' (default: 'all') --> decides for which X data classification reports will be printed
+    - plot_CM = True (True / False) --> plot Confusion Matrix
+    - normalize{‘true’, ‘pred’, ‘all’, None}, default='true'
+        -> Either to normalize the counts display in the matrix:
+            if 'true', the confusion matrix is normalized over the true conditions (e.g. rows);
+            if 'pred', the confusion matrix is normalized over the predicted conditions (e.g. columns);
+            if 'all', the confusion matrix is normalized by the total number of samples;
+            if None, the confusion matrix will not be normalized.
+    - model_infos = True --> decide to plot infos about data prepro & model
+        
+    print:
+    - selected parameters for preprocessing, train-test-split and scaling
+    - classification report
+    - confustion matrix
+    
+    return: y_pred_train, y_pred_test
+    '''
+    #summary of selected options:
+    if model_infos:
+        model_summary_st(model, y_train, y_test, ds_target = ds_target,split_by_date = split_by_date, encoder = encoder, ds_reasons = ds_reasons)
+    
+    # create predictions
+    y_pred_train = model.predict(X_train)
+    y_pred_test = model.predict(X_test)
+    
+    if data == 'train':
+        print('Classification Report for train data:\n\n', classification_report(y_train, y_pred))
+        if plot_CM:
+            ConfusionMatrixDisplay.from_estimator(model, X_train, y_train, normalize=norm_CM)
+            plt.title(f'Confusion Matrix of Train Data. Normalized by: {norm_CM}')
+    elif data == 'test':
+        y_pred = model.predict(X_test)
+        print('Classification Report for test data:\n\n', classification_report(y_test, y_pred))
+        #print('F1 score on test set:', f1_score(y_test, y_pred_test).round(2))
+        if plot_CM:
+            ConfusionMatrixDisplay.from_estimator(model, X_test, y_test, normalize=norm_CM)
+            plt.title(f'Confusion Matrix of Test Data. Normalized by: {norm_CM}')
+    elif data == 'all':
+        print('Classification Report for train data:\n\n',classification_report(y_train, y_pred_train))
+        print('_________________________________________________________\n')
+        print('Classification Report for test data:\n\n', classification_report(y_test, y_pred_test))
+        #print('F1 score on test set:', f1_score(y_test, y_pred_test).round(2))
+
+        if plot_CM:
+            fig, axes = plt.subplots(1,2, sharey=True)
+            plt.suptitle(f'Confusion Matrix. Normalized by: {norm_CM}')
+            ConfusionMatrixDisplay.from_estimator(model, X_train, y_train, normalize=norm_CM, ax=axes[0])
+            axes[0].set_title(f'Train Data')
+            ConfusionMatrixDisplay.from_estimator(model, X_test, y_test, normalize=norm_CM, ax = axes[1])
+            axes[1].set_title(f'Test Data')
+    else:
+        print('data value not set correctly')
+    return y_pred_train, y_pred_test, f1_score(y_test, y_pred_test).round(2)
+
+# copy to churn_helpers and remove, if not changed anymore
+def model_summary_st(model , y_train = y_train, y_test = y_test, ds_target = ds_target, filename = filename, scale=scale, scaler = scaler,split_by_date = split_by_date, encoder = encoder, ds_reasons = ds_reasons):
+    
+    
+    #print model
+    print('selected model:',model.__class__.__name__)
+    
+    # print target
+    if ds_target:
+        print('selected target: ds_terminated with ds_reasons =', ds_reasons)
+    else:
+        print('selected target: terminated')
+    
+    if filename:
+        print('selected preprocessing file:',filename)
+    
+    #print encoder
+    if encoder is not None:
+        print('Encoded by:', encoder.__class__.__name__)
+    else:
+        print('Encoded by: GetDummies')
+    
+    # print normalizer
+    if scale:
+        if scaler:
+            print('Normalized by',scaler.__class__.__name__)
+        else:
+            print('Normalized')
+    
+    # print split-type
+    if split_by_date:
+        print('train & test data splitted by date')
+    else:
+        print('train & test data splitted randomly')
+    
+    # print target ratio
+    train_ratio = y_train.mean()
+    test_ratio = y_test.mean()
+    print(f'ratio of positive class within train data: {train_ratio:.1%} and test data {test_ratio:.1%}')
+    print('_________________________________________________________\n')
+
+
+    #_________________________________________________________________________________________________________________________
+    
+# copy to churn_helpers and remove, if not changed anymore
+def shap_create_and_summary_st(model, data=X_train, plot='summary', example=None, model_infos=True,
+                            y_train=y_train, y_test=y_test, scale=scale, scaler=scaler,
+                            split_by_date=split_by_date, Explainer='Explainer', ds_target=ds_target,
+                            num_features=None):
+    '''
+    creates shap explainer and plots summary
+    
+    input:
+    - model
+    - data: X_train, X_test (default = X_train)
+    - plot: kind of plot ('summary' / 'bar' / 'beeswarm', default = 'summary')
+    - example: plot example for this sample (default: None)
+    - model_infos: decide to plot infos about data prepro & model (default = True)
+    - num_features: Number of top features to include in the summary plot (default: None, which plots all features)
+    
+    return:
+    explainer, shap_values
+    
+    example: 
+    xgb_explainer, xgb_shap_values = shap_create_and_summary(xgb_model, num_features=10)
+    '''
+    # Get Shap Values
+
+    # initiate explainer
+    if Explainer == 'Explainer':
+        explainer = shap.Explainer(model=model)
+    elif Explainer == 'TreeExplainer':
+        explainer = shap.TreeExplainer(model=model)
+
+    shap_values = explainer(data)
+
+    # reshape shap values, if they are 3dim
+    if len(shap_values.shape) == 3:
+        shap_values_3d = shap_values
+        # Extract the first column of SHAP values
+        shap_values_first_col = shap_values_3d.values[:, :, 0]
+        base_values_first_col = shap_values_3d.base_values[:, 0]
+        shap_values = shap.Explanation(shap_values_first_col, base_values=base_values_first_col, data=data)
+
+    # summary of selected options:
+    if model_infos:
+        model_summary(model, y_train, y_test, ds_target)
+
+    if plot == 'summary':
+        # Summary plot with specified number of features
+        if num_features is not None:
+            st_shap(shap.summary_plot(shap_values, data, max_display=num_features), height=300)
+        else:
+            st_shap(shap.summary_plot(shap_values, data), height=300)
+    elif plot == 'bar':
+        # most important features
+        st_shap(shap.plots.bar(shap_values), height=300)
+    elif plot == 'beeswarm':
+        st_shap(shap.plots.beeswarm(shap_values), height=300)
+
+    # print example waterfall
+    if example in range(len(data)):
+        print(f'waterfall for sample {example}:\n')
+        st_shap(shap.plots.waterfall(shap_values[example]), height=300)
+
+    return explainer, shap_values
+
+#_________________________________________________________________________________________________________________________
+
+# define function to plot examples
+def update_waterfall_plot(n, shap_values = shap_values):
+    '''
+    plots waterfall for sample n
+    '''
+
+    print(f'Waterfall for sample {n}:\n')
+    shap.plots.waterfall(shap_values[n])
+    
+    
+#__________________________________________________________________________________________________________________________
+
+def train_test_dist(X_train, X_test, col = 'start_Year'):
+    # Calculate the common range for both plots
+    combined_data = pd.concat([X_train[col], X_test[col]])
+    x_min = combined_data.min() 
+    x_max = combined_data.max() 
+
+    # set years as number of bins
+    bins = (x_max - x_min) + 1
+    bin_edges = np.arange(x_min - 0.5, x_max + 1.5, 1)
+
+    # create subplots
+    fig, axs = plt.subplots(2, 1, figsize=(6, 3), sharex=True)
+    fig.suptitle(f'Distribution of {col} in X_train & X_test', fontsize=14)
+
+    # Plot for X_train
+    axs[0].hist(X_train[col], bins=bin_edges, range=(x_min, x_max), color='blue', alpha=0.7, align='mid')
+    axs[0].set_title('Policy Start Year Distribution - X_train')
+    axs[0].set_ylabel('Frequency')
+
+    # Plot for X_test
+    axs[1].hist(X_test[col], bins=bin_edges, range=(x_min, x_max), color='green', alpha=0.7, align='mid')
+    axs[1].set_title('Policy Start Year Distribution - X_test')
+    axs[1].set_xlabel('Policy Start Year')
+    axs[1].set_ylabel('Frequency');
