@@ -6,7 +6,7 @@ Created on Sun Jul  2 15:07:52 2023
 """
 import streamlit as st
 
-st.set_page_config(page_title="02_Sales Forecast")
+st.set_page_config(page_title="02_Sales Forecast",layout="wide")
 
 
 
@@ -36,17 +36,17 @@ with st.sidebar:
         "Choose:",
         ("DataViz", "Modelling")
     )
-    
+
 if add_radio == "DataViz":
-    
+
     st.markdown("# Data Exploration and Visualization")
-    
+
     st.write(
         """#### Target Values:
            """
         )
 
-        
+
     st.write("""***Create target values:*** sum PremiumAmount, count ContractID
              """
              )
@@ -59,13 +59,13 @@ if add_radio == "DataViz":
          3. Different Model & Zone --> There is variation, so we need to group by this columns as well.
              """
              )
-    
+
     #Build a timeline with a sum of premiumAmount and ContractID count
     st.write(
         """##### Premium Amount (sum) and ContractID (count) grouped by PremiumMonth:
             """
     )
-    
+
     group_cols = ['premiumMonth']
     apply = {'premiumAmount': 'sum', 'ContractID': 'count'}
     st.pyplot(plot_grouped_data(df, group_cols= group_cols, apply=apply, x='premiumMonth'))
@@ -79,9 +79,9 @@ if add_radio == "DataViz":
         this drop
         """
         )
-    
+
     #Build a plot of different regions to explain the drop due to the product range change
-        
+
     group_cols2 = group_cols + ["ZoneDesc"]
     x = 'premiumMonth'
     apply2 = {'ContractID': 'count'}
@@ -92,13 +92,13 @@ if add_radio == "DataViz":
     from helpers import auto_convert_columns_to_datetime
     df_grouped_pM_and_Zone = auto_convert_columns_to_datetime(df_grouped_pM_and_Zone)
     df_grouped_pM_and_Zone.info()
-        
-    
+
+
     st.write(
         """##### The drop between 2018 and 2019 can be explained by the zones change: 
             """
     )
-    
+
     st.pyplot(plot_line_plots(df_grouped_pM_and_Zone, hue= 'ZoneDesc', y=['count_ContractID']))
 
     st.write(
@@ -109,23 +109,23 @@ if add_radio == "DataViz":
 
     #PolicyAgeAtPremium - check the distribution of PolicyAge and ContractID count
     from helpers import plot_subplots
-    
+
     st.write(
         """##### PolicyAgeAtPremium vs ContractID counts and PremiumAmount: 
             """
     )
-    
-    
+
+
     group_cols = ['PolicyAgeAtPremium']
     apply = {'ContractID':'count','premiumAmount':'mean',}
-    groupby_and_apply(df, group_cols=group_cols, apply=apply)  
+    groupby_and_apply(df, group_cols=group_cols, apply=apply)
 
     columns = ['premiumAmount','ContractID']
     apply_columns = {'premiumAmount':'mean', 'ContractID' : 'count'}
-    st.pyplot(plot_subplots(df, 'PolicyAgeAtPremium', other_columns=columns , functions=apply_columns))     
-    
+    st.pyplot(plot_subplots(df, 'PolicyAgeAtPremium', other_columns=columns , functions=apply_columns))
+
 #else:
-    
+
 
 
 #Exploration of all the columns to decide which and how to use them.
@@ -134,275 +134,140 @@ if add_radio == "DataViz":
 #Create a Modelling sub-page
 
 if add_radio == "Modelling":
-   
+
    st.markdown("# Modelling")
 
    # Define options
    projects = ['Time Series', 'Classification']
-   zone_options = ['Old Model Zone', 'New Model Zone']
+   zone_options = ['All Zones','Old Model Zone', 'New Model Zone']
+
    model_options = ['SARIMA', 'Multiple Linear Regression', 'Random Forest Regressor', 'XGBoost']
    output_options = ['Metrics and Diagramm', 'Forecast 6 months']
-    
+
    model_options_class = ['KNN', 'SVM']
    metric_options = ['Chebyshev', 'Manhattan', 'Minkowski']
    optimizing_options_class= ['Yes', 'No']
    output_options_class = ['Metrics', 'Forecast']
-    
-       
+
+
    # Level 1: Time series and classification
    project_choice = st.selectbox('Select the project:', projects)
-    
+
    if project_choice == 'Time Series':
        st.subheader('Time Series Options:')
-        
+
        zone_united = st.selectbox('Choose Zone', zone_options)
+       if zone_united =='All Zones':
+           old = None
+           new = None
+       if zone_united == 'Old Model Zone':
+            old = st.selectbox('Choose:',df_2['Model_Zone'].unique())
+            new = None
+
+       elif zone_united == 'New Model Zone':
+            new = st.selectbox('Choose:',df_2['Zone_united'].unique())
+            old = None
+       df_grouped = hts.group_df_per_month(df_2, timerange='2023-01-01', old=old, new=new)
+       #st.write(df_grouped.head())
+       selected_lag = st.selectbox("Choose Lags:", options=list(range(1, 13)))
+       df_features = hts.choose_features(df_grouped, 'all', lag_count=selected_lag)
+       df_features = df_features.dropna()
+
+       #st.plotly_chart(hts.plot_timeseries(df_features))
+       #st.write(df_features.head())
+       unique_years = pd.to_datetime(df_features.index).year.unique()
+
+       # Benutzeroberfläche erstellen
+       selected_year = st.selectbox("Train/Test Split Year:", options=unique_years[-4:])
+
+       # Erstelle den ausgewählten String im gewünschten Format 'jahr-01-01'
+       selected_date_string = f"{selected_year}-01-01"
+       train, test = hts.train_test(df_features, selected_date_string)
+       #st.write(train.head())
        model = st.selectbox('Select model:', model_options)
-       output = st.selectbox('Output:', output_options)
-    
+       period = st.selectbox('Forecast Months:', options=list(range(1, 13)))
+       #output = st.selectbox('Output:', output_options)
+
        if st.button('Analyze'):
-           if zone_united == 'Old Model Zone':
+           if model == 'Multiple Linear Regression':
 
-                df_2 = hts.choose_Zone(df_2, zoneUnited=None)
-                df_grouped = hts.group_df_per_month(df_2, '2023-01-01')
-                #image = Image.open('../plotly/old_model_zone.png')
-                #st.write(df_grouped.head())
-                if model != "SARIMA":
+               model, X_train, y_train, X_test, y_test, best_params = hts.multiple_linear_regression_2(train, test,'premiumAmount')
+               results = hts.evaluate_regression_model(model, X_train, y_train, X_test, y_test, best_params)
+               y_train_pred = model.predict(X_train)
+               y_test_pred = model.predict(X_test)
+               st.write('Metrics and Best Params:')
+               st.write(results)
+               st.write('Forecast:')
+               future_pred = hts.forecast_regression(df_features, period=period, lag_count=selected_lag, model=model)
+               st.write(future_pred['premiumAmount'])
+               st.plotly_chart(hts.graph(X_train, y_train, X_test, y_test, y_train_pred, y_test_pred, future_pred=future_pred,title='Forecast Multiple Lineare Regression'))
 
-                    if model == "Multiple Linear Regression":
-                        if output == "Metrics and Diagramm":
-                            st.subheader("Results:")
-                            st.write("Zone: " + zone_united)
-                            st.write("Model: " + model)
-                            lag_count = 12
-                            df_features = hts.choose_features(df_grouped, 'all', lag_count=lag_count)
-                            df_features = df_features.dropna()
-                            st.write("Data with Features: ")
-                            st.write(df_features.head())
-                            st.write("Train Data 2015-2020")
-                            st.write("Train Data 2021-2022")
-                            train, test = hts.train_test(df_features, '2021-01-01')
-                            mlr_model, X_train, y_train, X_test, y_test = hts.multiple_linear_regression(train, test, 'premiumAmount')
-                            y_train_pred = mlr_model.predict(X_train)
-                            y_test_pred = mlr_model.predict(X_test)
-                            evaluation_results = hts.evaluate_regression_model(mlr_model, X_train, y_train, X_test, y_test)
-                            st.write(evaluation_results)
-                            image = Image.open('plotly/ml_mlr.png')
-                            st.image(image, caption='Multiple Lineare Regression')
-                        if output == "Forecast 6 months":
-                            st.subheader("Forecast:")
-                            image = Image.open('plotly/ml_mlr_forecst.png')
-                            st.image(image, caption='Random Forest Regressor Forecast')
+           if model == 'Random Forest Regressor':
+               model, X_train, y_train, X_test, y_test, best_params = hts.random_forest_tree(train, test,'premiumAmount')
+               results = hts.evaluate_regression_model(model, X_train, y_train, X_test, y_test, best_params)
+               y_train_pred = model.predict(X_train)
+               y_test_pred = model.predict(X_test)
+               st.write('Metrics and Best Params:')
+               st.write(results)
+               st.write('Forecast:')
+               future_pred = hts.forecast_regression(df_features, period=period, lag_count=selected_lag, model=model)
+               st.write(future_pred['premiumAmount'])
+               st.plotly_chart(
+                   hts.graph(X_train, y_train, X_test, y_test, y_train_pred, y_test_pred, future_pred=future_pred,
+                             title='Forecast Random Forest Regressor'))
 
-                    if model == "XGBoost":
-                        if output == "Metrics and Diagramm":
-                            st.subheader("Results:")
-                            st.write("Zone: " + zone_united)
-                            st.write("Model: " + model)
-                            lag_count = 12
-                            df_features = hts.choose_features(df_grouped, 'all', lag_count=lag_count)
-                            df_features = df_features.dropna()
-                            st.write("Data with Features: ")
-                            st.write(df_features.head())
-                            st.write("Train Data 2015-2020")
-                            st.write("Train Data 2021-2022")
-                            train, test = hts.train_test(df_features, '2021-01-01')
-                            xgboost_model, X_train, y_train, X_test, y_test = hts.xgboost(train, test, 'premiumAmount')
-                            y_train_pred = xgboost_model.predict(X_train)
-                            y_test_pred = xgboost_model.predict(X_test)
-                            evaluation_results = hts.evaluate_regression_model(xgboost_model, X_train, y_train, X_test, y_test)
-                            st.write(evaluation_results)
-                            image = Image.open('../plotly/xgboost.png')
-                            st.image(image, caption='XGBoost')
-                        if output == "Forecast 6 months":
-                            st.subheader("Forecast:")
-                            image = Image.open('../plotly/xgboost_forecast.png')
-                            st.image(image, caption='XGBoost Forecast')
+           if model == 'Random Forest Regressor':
+                   model, X_train, y_train, X_test, y_test, best_params = hts.random_forest_tree(train, test,
+                                                                                                 'premiumAmount')
+                   results = hts.evaluate_regression_model(model, X_train, y_train, X_test, y_test, best_params)
+                   y_train_pred = model.predict(X_train)
+                   y_test_pred = model.predict(X_test)
+                   st.write('Metrics and Best Params:')
+                   st.write(results)
+                   st.write('Forecast:')
+                   future_pred = hts.forecast_regression(df_features, period=period, lag_count=selected_lag,
+                                                         model=model)
+                   st.write(future_pred['premiumAmount'])
+                   st.plotly_chart(
+                       hts.graph(X_train, y_train, X_test, y_test, y_train_pred, y_test_pred, future_pred=future_pred,
+                                 title='Forecast Random Forest Regressor'))
 
-                    if model == "Random Forest Regressor":
-                        if output == "Metrics and Diagramm":
-                            st.subheader("Results:")
-                            st.write("Zone: " + zone_united)
-                            st.write("Model: " + model)
-                            lag_count = 12
-                            df_features = hts.choose_features(df_grouped, 'all', lag_count=lag_count)
-                            df_features = df_features.dropna()
-                            st.write("Data with Features: ")
-                            st.write(df_features.head())
-                            st.write("Train Data 2015-2020")
-                            st.write("Train Data 2021-2022")
-                            train, test = hts.train_test(df_features, '2021-01-01')
-                            rf_model, X_train, y_train, X_test, y_test = hts.random_forest_tree(train, test, 'premiumAmount')
-                            y_train_pred = rf_model.predict(X_train)
-                            y_test_pred = rf_model.predict(X_test)
-                            evaluation_results = hts.evaluate_regression_model(rf_model, X_train, y_train, X_test, y_test)
-                            st.write(evaluation_results)
-                            image = Image.open('rf.png')
-                            st.image(image, caption='Random Forest Regressor')
-                        if output == "Forecast 6 months":
-                            st.subheader("Forecast:")
-                            image = Image.open('../plotly/rf_forecast.png')
-                            st.image(image, caption='Random Forest Regressor Forecast')
-                else:
-                    import statsmodels.api as sm
+           if model == 'XGBoost':
+                   model, X_train, y_train, X_test, y_test, best_params = hts.xgboost(train, test,'premiumAmount')
+                   results = hts.evaluate_regression_model(model, X_train, y_train, X_test, y_test, best_params)
+                   y_train_pred = model.predict(X_train)
+                   y_test_pred = model.predict(X_test)
+                   st.write('Metrics and Best Params:')
+                   st.write(results)
+                   st.write('Forecast:')
+                   future_pred = hts.forecast_regression(df_features, period=period, lag_count=selected_lag,
+                                                         model=model)
+                   st.write(future_pred['premiumAmount'])
+                   st.plotly_chart(
+                       hts.graph(X_train, y_train, X_test, y_test, y_train_pred, y_test_pred, future_pred=future_pred,
+                                 title='Forecast XGboost'))
+           if model == 'SARIMA':
+               import statsmodels.api as sm
+               df_sarima = df_features['premiumAmount']
+               df_sarima = pd.DataFrame(df_sarima)
+               st.pyplot(hts.plot_acf_pacf(df_sarima))
+               #train, test = hts.train_test(df_sarima, selected_date_string)
+               train_sarima, test_sarima = hts.train_test(df_sarima, selected_date_string)
+               order = (1, 1, 0)  # (p, d, q)
+               seasonal_order = (1, 1, 0, 12)  # (P, D, Q, S)
+               sarima = sm.tsa.SARIMAX(train_sarima, order=order, seasonal_order=seasonal_order)
+               sarima = sarima.fit(disp=0)
+               y_train_sarima_pred = sarima.predict(train_sarima.index.min(), train_sarima.index.max())
+               y_test_sarima_pred = sarima.predict(test_sarima.index.min(), test_sarima.index.max())
+               st.write(sarima.summary())
+               sarima_future_pred = sarima.predict(test_sarima.index.max(),
+                                                   test_sarima.index.max() + pd.DateOffset(months=period))
 
-                    if output == "Metrics and Diagramm":
-                        lag_count = 12
-                        df_features = hts.choose_features(df_grouped, 'all', lag_count=lag_count)
-                        df_features = df_features.dropna()
-                        df_sarima = pd.DataFrame(df_features['premiumAmount'], columns=['premiumAmount'])
-                        # st.write(df_sarima.columns)
-                        df_sarima_log = hts.stationary_log(df_sarima, kind='log')
-                        df_sarima_diff = hts.stationary_log(df_sarima_log, kind='diff')
-                        st.subheader("Results:")
-                        st.write("Zone: " + zone_united)
-                        st.write("Model: " + model)
-                        st.write("Log-Transformation = True")
-                        st.write("Differencing = 1")
-                        st.write("Stationary < 0.05")
-                        st.subheader("acf and pacf plot:")
-                        train, test = hts.train_test(df_sarima_diff, '2021-01-01')
-                        train_sarima = train['premiumAmount']
-                        # train_sarima.index = train_sarima.index.to_period('M')
-                        test_sarima = test['premiumAmount']
-                        st.pyplot(hts.plot_acf_pacf(df_sarima_diff))
-                        order = (1, 1, 0)  # (p, d, q)
-                        seasonal_order = (1, 1, 0, 12)  # (P, D, Q, S)
-                        sarima = sm.tsa.SARIMAX(train_sarima, order=order, seasonal_order=seasonal_order)
-                        sarima = sarima.fit(disp=0)
-                        y_train_sarima_pred = sarima.predict(train_sarima.index.min(), train_sarima.index.max())
-                        y_test_sarima_pred = sarima.predict(test_sarima.index.min(), test_sarima.index.max())
-                        evaluation_results = sarima.summary()
-                        st.write(evaluation_results)
-                        image = Image.open('plotly/sarima.png')
-                        st.image(image, caption='SARIMA')
-                    if output == "Forecast 6 months":
-                        st.subheader("Forecast:")
-                        image = Image.open('plotly/sarima_forecast.png')
-                        st.image(image, caption='SARIMA Forecast')
+               forecast = pd.DataFrame(sarima_future_pred)
+               forecast = forecast.rename(columns={'predicted_mean': 'premiumAmount'})
+               st.plotly_chart(hts.graph(train_sarima,train_sarima['premiumAmount'],test_sarima,test_sarima['premiumAmount'],y_train_sarima_pred,y_test_sarima_pred,future_pred=forecast,title='Forecast SARIMA'))
 
-           if zone_united == 'New Model Zone':
-               df_2 = hts.choose_Zone(df_2, zoneUnited=None)
-               df_grouped = hts.group_df_per_month(df_2, '2023-01-01')
-               # image = Image.open('old_model_zone.png')
-               # st.write(df_grouped.head())
-               if model != "SARIMA":
 
-                   if model == "Multiple Linear Regression":
-                       if output == "Metrics and Diagramm":
-                           st.subheader("Results:")
-                           st.write("Zone: " + zone_united)
-                           st.write("Model: " + model)
-                           lag_count = 12
-                           df_features = hts.choose_features(df_grouped, 'all', lag_count=lag_count)
-                           df_features = df_features.dropna()
-                           st.write("Data with Features: ")
-                           st.write(df_features.head())
-                           st.write("Train Data 2015-2020")
-                           st.write("Train Data 2021-2022")
-                           train, test = hts.train_test(df_features, '2021-01-01')
-                           mlr_model, X_train, y_train, X_test, y_test = hts.multiple_linear_regression(train, test,
-                                                                                                        'premiumAmount')
-                           y_train_pred = mlr_model.predict(X_train)
-                           y_test_pred = mlr_model.predict(X_test)
-                           evaluation_results = hts.evaluate_regression_model(mlr_model, X_train, y_train, X_test,
-                                                                              y_test)
-                           st.write(evaluation_results)
-                           image = Image.open('plotly/ml_mlr_oz.png')
-                           st.image(image, caption='Multiple Lineare Regression')
-                       if output == "Forecast 6 months":
-                           st.subheader("Forecast:")
-                           image = Image.open('plotly/ml_mlr_forecst_oz.png')
-                           st.image(image, caption='Random Forest Regressor Forecast')
-
-                   if model == "XGBoost":
-                       if output == "Metrics and Diagramm":
-                           st.subheader("Results:")
-                           st.write("Zone: " + zone_united)
-                           st.write("Model: " + model)
-                           lag_count = 12
-                           df_features = hts.choose_features(df_grouped, 'all', lag_count=lag_count)
-                           df_features = df_features.dropna()
-                           st.write("Data with Features: ")
-                           st.write(df_features.head())
-                           st.write("Train Data 2015-2020")
-                           st.write("Train Data 2021-2022")
-                           train, test = hts.train_test(df_features, '2021-01-01')
-                           xgboost_model, X_train, y_train, X_test, y_test = hts.xgboost(train, test, 'premiumAmount')
-                           y_train_pred = xgboost_model.predict(X_train)
-                           y_test_pred = xgboost_model.predict(X_test)
-                           evaluation_results = hts.evaluate_regression_model(xgboost_model, X_train, y_train, X_test,
-                                                                              y_test)
-                           st.write(evaluation_results)
-                           image = Image.open('plotly/xgboost_oz.png')
-                           st.image(image, caption='XGBoost')
-                       if output == "Forecast 6 months":
-                           st.subheader("Forecast:")
-                           image = Image.open('plotly/xgboost_forecast_oz.png')
-                           st.image(image, caption='XGBoost Forecast')
-
-                   if model == "Random Forest Regressor":
-                       if output == "Metrics and Diagramm":
-                           st.subheader("Results:")
-                           st.write("Zone: " + zone_united)
-                           st.write("Model: " + model)
-                           lag_count = 12
-                           df_features = hts.choose_features(df_grouped, 'all', lag_count=lag_count)
-                           df_features = df_features.dropna()
-                           st.write("Data with Features: ")
-                           st.write(df_features.head())
-                           st.write("Train Data 2015-2020")
-                           st.write("Train Data 2021-2022")
-                           train, test = hts.train_test(df_features, '2021-01-01')
-                           rf_model, X_train, y_train, X_test, y_test = hts.random_forest_tree(train, test,
-                                                                                               'premiumAmount')
-                           y_train_pred = rf_model.predict(X_train)
-                           y_test_pred = rf_model.predict(X_test)
-                           evaluation_results = hts.evaluate_regression_model(rf_model, X_train, y_train, X_test,
-                                                                              y_test)
-                           st.write(evaluation_results)
-                           image = Image.open('plotly/rf_oz.png')
-                           st.image(image, caption='Random Forest Regressor')
-                       if output == "Forecast 6 months":
-                           st.subheader("Forecast:")
-                           image = Image.open('plotly/rf_forecast_oz.png')
-                           st.image(image, caption='Random Forest Regressor Forecast')
-               else:
-                   import statsmodels.api as sm
-
-                   if output == "Metrics and Diagramm":
-                       lag_count = 12
-                       df_features = hts.choose_features(df_grouped, 'all', lag_count=lag_count)
-                       df_features = df_features.dropna()
-                       df_sarima = pd.DataFrame(df_features['premiumAmount'],columns=['premiumAmount'])
-                       #st.write(df_sarima.columns)
-                       df_sarima_log = hts.stationary_log(df_sarima, kind='log')
-                       df_sarima_diff = hts.stationary_log(df_sarima_log, kind='diff')
-                       st.subheader("Results:")
-                       st.write("Zone: " + zone_united)
-                       st.write("Model: " + model)
-                       st.write("Log-Transformation = True")
-                       st.write("Differencing = 1")
-                       st.write("Stationary < 0.05")
-                       st.subheader("acf and pacf plot:")
-                       train, test = hts.train_test(df_sarima_diff, '2021-01-01')
-                       train_sarima = train['premiumAmount']
-                       # train_sarima.index = train_sarima.index.to_period('M')
-                       test_sarima = test['premiumAmount']
-                       st.pyplot(hts.plot_acf_pacf(df_sarima_diff))
-                       order = (1, 1, 0)  # (p, d, q)
-                       seasonal_order = (1, 1, 0, 12)  # (P, D, Q, S)
-                       sarima = sm.tsa.SARIMAX(train_sarima, order=order, seasonal_order=seasonal_order)
-                       sarima = sarima.fit(disp=0)
-                       y_train_sarima_pred = sarima.predict(train_sarima.index.min(), train_sarima.index.max())
-                       y_test_sarima_pred = sarima.predict(test_sarima.index.min(), test_sarima.index.max())
-                       evaluation_results = sarima.summary()
-                       st.write(evaluation_results)
-                       image = Image.open('plotly/sarima_oz.png')
-                       st.image(image, caption='SARIMA')
-                   if output == "Forecast 6 months":
-                       st.subheader("Forecast:")
-                       image = Image.open('plotly/sarima_forecast_oz.png')
-                       st.image(image, caption='SARIMA Forecast')
 
 
 
