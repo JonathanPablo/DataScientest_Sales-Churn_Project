@@ -8,177 +8,35 @@ import numpy as np
 import streamlit as st
 
 st.set_page_config(
-    page_title="SalesData_Project",
+    page_title="Sales Forecast & Churn Prediction",layout="wide"
     )
 
-st.write("# Sales Data Project")
+st.header("Sales- & Churn-prediction of health-insurance data")
 
-st.write(
-    """
-    Course: DS Continious 2023
-    
-    Participants: Jonathan Leipold, Christian Hirning, Rumiya Al-Meri
-
-    ### About the project:
-        - The project deals with the sales data from the broker company 
-        which sells health insurance for abroad. 
-        - The main target group are the expats who needs the health insurance 
-        for a longer time period.
-        - The data owner is a BDAE company, the representative is JL.
-    
-    ### About the product:
-        - For this particular project one product (insurance type) was chosen 
-        to reduce the complexity.
-        - The product price is a premium amount which is paid by a client on a
-        monthly, quarterly or a yearly basis.
-   
-    ### Goals of the project:
-        1. Find the best model for forecasting / predicting the premium amount
-        2. Find out how premium adjustments impact the value of premium amount  
-        3. Find the premium adjustments which maximize the premium amount
-        
-    ### Data description:
-        
-        - Two databases are available for analysis: 
-            - Sales Data in form of transactions for the period of 
-            2014 - 2023YTD, in total about 230 000 transactions
-            - Premium adjustments data
-        
-        - Variables Sales Data:
-           
-            - Numerical variables:
-                AgeAtPremium - Age of Insured Person at PremiumMonth [Years]
-                PolicyAgeAtPremium - Age of Contract at PremiumMonth [Years]
-                premiumAmount - Target-value - paid premiumAmount (aggregated 
-                by Product,CmpPrivate, Deductible, Zone, Time)
-                FeeAmount - Fee that the broker (the company) gets from the 
-                premium amount (from the insurance company)
-               
-            - Categorical variables:
-                Main-/Sub-ProductCode - Product
-                Deductible - Deductible of Contract
-                Nation of Premium/Treatment - Nationality of Insured Person
-                Zone-(Model) - Zone of country
-                Customer-Type (company/private) - Private(I) or Company(C)
-            
-            - Time variables:
-                BirthDate - birth date of an insured person
-                premium_startDate / premium_endDate - month the premium is 
-                paid, always for a month
-                policy_StartDate - contract start date
-                policy_EffEndDate - effective end of contract possibly infinite
-                (NULL OR 31.12.2099)
 """
-)
+Course: DS Continious 2023
+
+Participants: Jonathan Leipold, Christian Hirning, Rumiya Al-Meri
 
 
-st.write(
-    """### Data Import and first exploration:"""
-)
-st.write(
-    """#### Dataframe Preview:"""
-)
+### Introduction
+This demo shows some results of a project during the course 'Data Science Continuous Mar23' of DataScientest. 
 
+The project works with real data from a company specialized on international health insurance products. The data comes directly from the companies ERP System and contains contract- as well as premium- & claims-related informations in pseudonymised form.
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns   
+The main objective was to create the best performing model for sales predictions, in particularly prediction of premium amounts per month. Due to the big variety of product characteristics, only transactions concerning one main product type were considered to build a prototype.
 
-#import df. set encoding to 'latin-1' necassary to fit to csv-file
-df = pd.read_csv('SalesDate-Example.csv',encoding='latin-1')
+#### Initially 2 main goals were defined in the first sub-project:
+  1.	Find the best model for forecasting / predicting the premium amount
+  2.	Find out how premium adjustments impact the value of premium amount 
 
-pd.set_option('display.max_columns', None) #allow display of all columns
+During the project, the project group faced the problem of a limited number of features which are known for the future. Therefore, it was decided on project extension with the further objective, namely churn predictions. The contracts’ data for all products was taken and enriched by additional, information from the ERP-System. 
 
-#display df
-st.dataframe(df)
+#### Withing this second sub-project another 2 goals were defined:
+  1.	Identify main features that have an impact on customers’ termination behaviour
+  2.	Find active contracts that are more likely to get terminated by the customer
 
-#Columns info 
-st.write(
-    """#### Columns information:"""
-)
+More Information can be found in detailled form in the __[Final Report](<https://github.com/JonathanPablo/DataScientest_Sales-Churn_Project/blob/main/Sales%20Forecast%20and%20Churn%20Prediction_Final%20Report.docx>)__.
 
-#Columns Info to output in the app
-import io
-buffer = io.StringIO()
-df.info(buf=buffer)
-s = buffer.getvalue()
-
-st.text(s)
-
-st.write(
-    """ ***Observation***: date columns have dtype 'object' --> change to datetime 
-    """
-)
-
-#Date columns to convert into date type
-from helpers import convert_columns_to_datetime
-#help(convert_columns_to_datetime) #Description of the function -> uncomment, if needed
-
-columns_to_convert = ['BirthDate','premium_startDate', 'premium_endDate', 'policy_StartDate', 'policy_EffEndDate']
-
-df = convert_columns_to_datetime(df, columns_to_convert)
-st.text(df.dtypes)
-
-st.write(
-    """#### Description of numerical columns:"""
-)
-
-st.write(df.describe())
-
-st.write(
-    """ ***Observations***: 
-            1. AgeAtPremium and PolicyAgeAtPremium get a negative value of -1 --> 
-            explore transactions with the negative Age
-            2. Premium amount and FeeAmount get negative value in case of cancelled 
-            transactions or wrongly booked transactions
-            3. Zone: -1???
-            4. Deductible has only value 0 (this is due to the fact, that we only 
-            look at one product and that this product offers only deuctible = 0).
-            Drop Deductible column.
-    """
-)
-
-df.drop(columns=['Deductible'], inplace= True)
-
-st.write(
-    """#### Import of additional premiumAdjustment df:
-        """
-        )
-        
-st.write(
-        """ ***The premium_adjustments_example*** data base contains informaion about 
-        past adjustments of premiumAmounts of this product.
-        The premium adjustments need to be identified not just by their start 
-        date but as well by their product option.
-        Depending on product this can be defined by variations in model, zone, 
-        age-group, deductible.        
-        """
-   )
-
-pA = pd.read_csv('premium_adjustments_example.csv', sep=';')
-
-#display df
-st.dataframe(pA)
-
-#first informations
-st.write(pA.info())
-st.write(pA.describe())
-
-#Columns Info to output in the app
-import io
-buffer = io.StringIO()
-df.info(buf=buffer)
-s = buffer.getvalue()
-
-st.text(s)
-
-st.write(
-    """ ***Observation***: We can already see, that there is no variation 
-    in Min, Max- and MaxSign-Age. Later a closer look on this df, after the
-    preprocessing of the main df.
-    """
-)
-
-df1 = pd.read_csv('SalesData_preprocessed.csv',encoding='latin-1')
-
+To go to results of the 2 sub-projects click the sections on the right.
+"""

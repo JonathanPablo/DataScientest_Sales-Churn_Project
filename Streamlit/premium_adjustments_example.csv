@@ -1,0 +1,9 @@
+product_code;MainProductCode;MainProductName;Zone;Deductible;AgeGroup_min;AgeGroup_max;BAP_date;premium_old;premium_new
+Q010.005.000;G014;Expat Example;A;500;;50;01.03.2024;100;120
+Q010.005.000;G014;Expat Example;A;500;51;;01.03.2024;110;130
+Q010.005.000;G014;Expat Example;A;0;;50;01.03.2024;150;170
+Q010.005.000;G014;Expat Example;A;0;51;;01.03.2024;170;190
+Q010.005.000;G014;Expat Example;B;500;;50;01.03.2024;80;90
+Q010.005.000;G014;Expat Example;B;500;51;;01.03.2024;90;100
+Q010.005.000;G014;Expat Example;B;0;;50;01.03.2024;130;140
+Q010.005.000;G014;Expat Example;B;0;51;;01.03.2024;150;160
