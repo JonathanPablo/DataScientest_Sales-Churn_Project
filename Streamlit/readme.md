@@ -1,1 +1,1 @@
-This folder contains files for demonstration of results in streamlit. Main File is __[Introduction](/Introduction.py)__, which contains the sub-project results that can be found in the subfolder __[pages](/pages)__.
+This folder contains files for demonstration of results in streamlit. Main File is __[Introduction](/Streamlit/Introduction.py)__, which contains the sub-project results that can be found in the subfolder __[pages](/Streamlit/pages)__.
