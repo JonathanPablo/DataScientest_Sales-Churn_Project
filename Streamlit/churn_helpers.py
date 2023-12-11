@@ -84,9 +84,9 @@ def extract_contracts(version = 'v2'):
     creates pandas df out of csv-file (default: 'BDAE_DataMining_Policies_v2.csv', must be in same folder) 
     '''
     if version == 'v2':
-        contracts = pd.read_csv('BDAE_DataMining_Policies_v2.csv', encoding = 'ISO-8859-1')
+        contracts = pd.read_csv('data/BDAE_DataMining_Policies_v2.csv', encoding = 'ISO-8859-1')
     elif version == 'v1':
-        contracts = pd.read_csv('BDAE_DataMining_Policies.csv', encoding = 'ISO-8859-1')
+        contracts = pd.read_csv('data/BDAE_DataMining_Policies.csv', encoding = 'ISO-8859-1')
     else:
         print('version not available')
     return contracts

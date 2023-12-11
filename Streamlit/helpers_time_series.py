@@ -308,7 +308,7 @@ def multiple_linear_regression_2(train, test, var):
     }
 
     # GridSearchCV for hyperparameter tuning
-    grid_search = GridSearchCV(estimator=lr_model, param_grid=param_grid, cv=3, scoring='neg_mean_squared_error')
+    grid_search = GridSearchCV(estimator=lr_model, param_grid=param_grid, scoring='neg_mean_squared_error')
     grid_search.fit(X_train, y_train)
 
     # Get the best model from the grid search
@@ -385,7 +385,7 @@ def random_forest_tree(train, test, var):
     rf_clf = RandomForestRegressor(random_state=1)
 
     # GridSearchCV for hyperparameter tuning
-    grid_search = GridSearchCV(estimator=rf_clf, param_grid=param_grid, cv=3, scoring='neg_mean_squared_error')
+    grid_search = GridSearchCV(estimator=rf_clf, param_grid=param_grid,  scoring='neg_mean_squared_error')
     grid_search.fit(X_train, y_train)
 
     # Get the best Random Forest model from the grid search
@@ -440,7 +440,7 @@ def xgboost(train, test, var):
     xgb_clf = xgb.XGBRegressor(objective='reg:squarederror', booster='gbtree', base_score=0.5)
 
     # GridSearchCV for hyperparameter tuning
-    grid_search = GridSearchCV(estimator=xgb_clf, param_grid=param_grid, cv=3, scoring='neg_mean_squared_error')
+    grid_search = GridSearchCV(estimator=xgb_clf, param_grid=param_grid,  scoring='neg_mean_squared_error')
     grid_search.fit(X_train, y_train)
 
     # Get the best XGBoost model from the grid search
