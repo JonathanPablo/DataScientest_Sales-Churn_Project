@@ -106,7 +106,7 @@ if add_radio == "Import & DataViz":
     if col1.button("Load Contracts") or st.session_state.contracts_loaded:
          # set 'contracts_loaded' to True
          st.session_state.contracts_loaded = True
-    
+
          st.session_state.contracts = transform_dtypes(extract_contracts())
          col1.write("Contracts DataFrame:")
          # print info
