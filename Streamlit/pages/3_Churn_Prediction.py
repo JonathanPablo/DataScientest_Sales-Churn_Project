@@ -558,9 +558,9 @@ if add_radio == "Modelling":
         
     if (train_test_button or st.session_state.train_test):
         st.write("Train and test data created & stored in session_state variables.")
-        col1, col2 = st.columns((1,3))
+        st.write('selected options:')
+        col1, col2 = st.columns((3,4))       
         
-        col1.write('selected options:')
         col1.write(st.session_state.selected_options)
         
         train_test_dist(X_train = st.session_state.X_train, X_test = st.session_state.X_test, col = 'start_Year')
@@ -570,6 +570,7 @@ if add_radio == "Modelling":
 
     # Modelling Part
     
+
     if train_test_button or st.session_state.model_sel:
         st.session_state.model_sel = True
         st.session_state.ds_selection = False # reset to remove picture afterwards
@@ -656,6 +657,18 @@ if add_radio == "Modelling":
         ########################################################################################################################################################
     
         # Main Field on the right
+
+        #show model comparison before first modelling
+        if (train_test_button or st.session_state.train_test) and not model_button:
+
+            st.subheader('Model results:')
+            # Open image of ModelComparison
+            image_path = st.session_state.image_folder + 'ModelComparison.png'
+            try:
+                image = Image.open(image_path)
+                st.image(image, caption='Comparison of Model results')
+            except FileNotFoundError:
+                st.error(f"Image file '{image_path}' not found. Please check the file path.")
         
         # Model definition
         if selected_model == 'XGBoost':
