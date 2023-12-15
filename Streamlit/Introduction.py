@@ -8,6 +8,9 @@ import numpy as np
 import streamlit as st
 from PIL import Image
 
+# define subfolder for images
+st.session_state.image_folder = 'images/streamlit/'
+
 st.set_page_config(
     page_title="Sales Forecast & Churn Prediction",layout="wide"
     )

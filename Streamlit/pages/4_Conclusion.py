@@ -39,8 +39,8 @@ except FileNotFoundError:
 
 '''
 ## Challenges
-- project management
 - real world data
 - preprocessing & interpretation
 - human made decisions
+- project management
 '''
