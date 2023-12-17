@@ -100,7 +100,9 @@ if add_radio == "Introduction":
             st.image(image, caption='ConfusionMatrix as description of the classification problem')
         except FileNotFoundError:
             st.error(f"Image file '{image_path}' not found. Please check the file path.")
-            
+
+    st.write('Measure of choice: F1-Score. Especially on the test data.')
+
     st.markdown('More information about the project can be found in __[github](https://github.com/JonathanPablo/DataScientest_Sales-Churn_Project/tree/main/ChurnProject)__.')
         
 
@@ -769,7 +771,7 @@ if add_radio == "Modelling":
                col1.text(classification_report(y_test, y_pred_test))
                f1_test = f1_score(y_test, y_pred_test).round(2)
                #y_pred_train, y_pred_test, f1_test = eval_model_st(model, data= 'all', X_train = X_train, X_test=X_test, y_train = y_train ,y_test=y_test, norm_CM=None,split_by_date =st.session_state.split_by_date, encoder = encoder, scale = scale, ds_target = ds_target, ds_reasons = ds_reasons, model_infos = False)
-            
+
                print_output.display_output()
                col1.write(f'**F1 Score on test set = {f1_test}**')
                

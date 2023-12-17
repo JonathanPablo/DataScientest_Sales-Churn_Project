@@ -9,7 +9,8 @@ import streamlit as st
 from PIL import Image
 
 # define subfolder for images
-st.session_state.image_folder = 'images/streamlit/'
+if 'image_folder' not in st.session_state:
+  st.session_state.image_folder = 'images/streamlit/'
 
 st.set_page_config(
     page_title="Sales Forecast & Churn Prediction",layout="wide"

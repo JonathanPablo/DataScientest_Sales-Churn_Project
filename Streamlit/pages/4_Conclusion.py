@@ -9,12 +9,22 @@ import streamlit as st
 from PIL import Image
 
 st.set_page_config(page_title="Conclusion",layout="wide")
+
+# define subfolder for images
+if 'image_folder' not in st.session_state:
+  st.session_state.image_folder = 'images/streamlit/'
+
 '''
 ## Results
 
 ### Sales Forecast:
-- Time series: Old Model Zone ML like XGBoost or Random Forest Regressor are suitable. For New Model Zone only Mulitple Linear Regression is suitable. 
-- Classification: KNN-model with Manhattan metric shows the best results; still the model cannot be applied in the business context.
+- Time series: 
+    - Best results over all Zones with Random Forest Regressor and XGboost. XGBoost is faster.
+    - Solid results on train & test data
+    - Forecast is generally should be treated with caution 
+- Classification: 
+    - KNN-model with Manhattan metric shows the best results
+    - still the model cannot be applied in the business context.
 '''
 
 '''### Churn Prediction:'''
@@ -39,8 +49,8 @@ except FileNotFoundError:
 
 '''
 ## Challenges
+- project management
 - real world data
 - preprocessing & interpretation
 - human made decisions
-- project management
 '''

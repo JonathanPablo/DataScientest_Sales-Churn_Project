@@ -152,7 +152,7 @@ if add_radio == "Modelling":
 
 
    # Level 1: Time series and classification
-   project_choice = st.selectbox('Select the project:', projects)
+   project_choice = st.selectbox('Model selection:', projects)
 
    if project_choice == 'Time Series':
        st.subheader('Time Series Options:')
