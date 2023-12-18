@@ -588,7 +588,7 @@ if add_radio == "Modelling":
          
             selected_model = st.selectbox("Select Classifier:", ["XGBoost", "RandomForest", "DecisionTree"])
             
-            select_parameters = st.selectbox("Select Parameters:", ['best', 'individual'])
+            select_parameters = st.selectbox("Select Parameters:", ['individual', 'best'])
          
             if selected_model == 'XGBoost':
                 sel_model = xgb.XGBClassifier()

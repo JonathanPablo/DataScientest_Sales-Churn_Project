@@ -20,11 +20,11 @@ if 'image_folder' not in st.session_state:
 ### Sales Forecast:
 - Time series: 
     - Best results over all Zones with Random Forest Regressor and XGboost. XGBoost is faster.
-    - Solid results on train & test data
-    - Forecast is generally should be treated with caution 
+    - Solid results on train & test data. Forecast should be treated with caution.
+    - Lack of features that are known for the future. 
 - Classification: 
-    - KNN-model with Manhattan metric shows the best results
-    - still the model cannot be applied in the business context.
+    - KNN-model with Manhattan metric shows the best results.
+    - Still the model cannot be applied in the business context.
 '''
 
 '''### Churn Prediction:'''

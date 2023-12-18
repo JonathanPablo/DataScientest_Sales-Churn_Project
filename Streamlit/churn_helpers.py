@@ -350,8 +350,10 @@ def transform_df(contracts, year_only = False, drop_cols = [], claim_ratios = Tr
         contracts['effEnd_Year'] = contracts['policy_effEndDate'].dt.year
         
     if year_only == False:
-        contracts['start_Month'] = contracts['policy_startDate'].dt.month
-        contracts['effEnd_Month'] = contracts['policy_effEndDate'].dt.month
+        if 'policy_startDate' in contracts.columns:
+            contracts['start_Month'] = contracts['policy_startDate'].dt.month
+        if 'policy_effEndDate' in contracts.columns:
+            contracts['effEnd_Month'] = contracts['policy_effEndDate'].dt.month
     #contracts.drop(columns=['policy_startDate','policy_effEndDate'], inplace=True) #drop later at train/test-split (to keep dataviz running for preprocessed df too)
         
             
